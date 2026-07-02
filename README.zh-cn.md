@@ -1,5 +1,9 @@
 # Vulhub 靶场管理平台
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
 **语言 / Language**: [English](README.md) | **中文**
 
 基于 Web 的漏洞靶场管理平台，用于浏览、启动、停止和监控本地 [vulhub](https://github.com/vulhub/vulhub) 漏洞环境。
@@ -55,33 +59,25 @@ range-platform/
 - Docker Desktop（已启用 `docker compose`）
 - 同级目录下存在 `vulhub/`（靶场来源，可通过 `VULHUB_ROOT` 调整）；若缺失，`deploy` 脚本会自动 `git clone` 拉取
 
-## 启动后端
+## 本地开发（可选）
+
+不使用 Docker 时，可分别启动后端与前端：
 
 ```powershell
+# 后端 -> http://127.0.0.1:8000（API 文档在 /docs）
 cd range-platform/backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# 生成配置文件（可按需修改）
 Copy-Item .env.example .env
-
-# 启动服务（默认 http://127.0.0.1:8000）
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
 
-首次启动会自动创建 SQLite 数据库并初始化管理员账户。API 文档见 `http://127.0.0.1:8000/docs`。
-
-## 启动前端
-
-```powershell
-cd range-platform/frontend
+# 前端 -> http://localhost:5173
+cd ../frontend
 npm install
-npm run dev     # 开发模式，默认 http://localhost:5173
+npm run dev        # 生产构建：npm run build -> frontend/dist
 ```
 
-生产构建：`npm run build`，产物位于 `frontend/dist`。
-
-浏览器访问 `http://localhost:5173`，使用默认账户登录。
+首次启动会自动创建 SQLite 数据库并初始化管理员账户。
 
 ## Docker 部署（单容器）
 
@@ -176,7 +172,7 @@ powershell -ExecutionPolicy Bypass -File .\manage.ps1 restart
 
 ## 一键部署（Linux / macOS / Windows）
 
-平台镜像在**目标主机上本地构建**（`docker compose up -d --build` 会在该机器重新构建），跨操作系统无需迁移构建产物——镜像本身基于 Linux 基础镜像（node / python / docker-cli），由 Docker 引擎负责运行，不存在跨平台二进制兼容问题。三大主流系统均提供一键脚本：
+平台镜像在**目标主机上本地构建**，跨操作系统无需迁移产物。三大主流系统均提供一键脚本：
 
 | 系统 | 脚本 | Docker 来源 |
 | ---- | ---- | ----------- |
@@ -207,20 +203,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 脚本会自动：检测发行版 → 缺失时安装 Docker 与 compose 插件并设为开机自启 → 生成 `.env`（随机 `SECRET_KEY`、**随机管理员密码**、自动填入本机 IP 作为 `SERVER_HOST`、把 vulhub 以**同路径**挂载）→ `docker compose up -d --build` → 输出访问地址、健康检查命令，并**一次性打印本次生成的管理员账号密码**（请立即记录，之后仅可在 `.env` 中查看）。重复执行是幂等的：已存在的 `.env` 不会被覆盖，管理员密码也不会改变。
 
-脚本覆盖的发行版与安装方式：
-
-| 发行版族 | 代表系统 | 安装方式 |
-| -------- | -------- | -------- |
-| Debian 系 | Debian / Ubuntu / Kali / Linux Mint / Pop!_OS / Raspbian | apt + docker-ce 官方源 |
-| RHEL 系 | CentOS / RHEL / Rocky / Alma / Oracle Linux | dnf\|yum + docker-ce 官方源 |
-| Fedora | Fedora | dnf + docker-ce（fedora 源）|
-| Amazon Linux | Amazon Linux 2 / 2023 | dnf\|amazon-linux-extras\|yum |
-| SUSE 系 | openSUSE / SLES | zypper |
-| Arch 系 | Arch / Manjaro / EndeavourOS | pacman |
-| Alpine | Alpine | apk |
-| 其它未知发行版 | — | 回退到 Docker 官方便捷脚本 `get.docker.com` |
-
-无论走哪条安装路径，脚本都会在最后校验 `docker compose` 是否可用，缺失 compose v2 插件时自动从 GitHub Releases 下载对应架构（x86_64/aarch64/armv7/ppc64le/s390x）的插件补齐；启动 Docker 守护进程时同时兼容 systemd 与 OpenRC（Alpine）。
+脚本自动识别发行版并安装 Docker 与 compose v2 插件——覆盖 Debian/Ubuntu/Kali/Mint（apt）、RHEL/CentOS/Rocky/Alma/Oracle/Fedora/Amazon Linux（dnf/yum）、openSUSE/SLES（zypper）、Arch/Manjaro（pacman）、Alpine（apk），其它发行版回退到 `get.docker.com`；缺失 compose 插件时会从 GitHub Releases 补齐，并同时兼容 systemd 与 OpenRC。
 
 > 随机密码仅在**首次部署（数据库为全新）**时生效——管理员账户在后端首次启动、数据库为空时按 `.env` 中的 `ADMIN_PASSWORD` 创建；此后即使修改 `.env` 也不会自动改动已存在账户的密码。
 
@@ -248,79 +231,29 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 > 若只想改密码而**保留现有数据**，请登录平台后在「用户管理」中修改，或用管理员账户走应用内的改密流程——不要用上面的 `-v` 命令，那会清空整个数据库。
 
-### 方式二：手动步骤（Linux）
+### 方式二：手动步骤
 
-> macOS / Windows 手动部署更简单：安装并启动 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后在 `range-platform/` 下参照 [Docker 部署（单容器）](#docker-部署单容器) 执行 `docker compose up -d --build` 即可（`.env` 可手动创建或直接用一键脚本生成）。
+一键脚本已自动完成以下所有操作；仅在脚本无法运行时才需手动执行。
 
-**1) 安装 Docker（按发行版任选其一）**
+1. **安装 Docker 与 compose 插件**：按[官方文档](https://docs.docker.com/engine/install/)选择你的发行版安装（Debian/Ubuntu/Kali 用 apt，RHEL/CentOS/Fedora 用 dnf 等），随后 `sudo systemctl enable --now docker`。macOS / Windows 直接安装并启动 [Docker Desktop](https://www.docker.com/products/docker-desktop/)。
+2. **配置 `.env`**（关键：让 vulhub 在容器内外路径一致）：
 
-Ubuntu / Debian / Kali（apt，Kali 使用 Debian `bookworm` 源）：
+   ```bash
+   cd range-platform
+   VULHUB=$(cd ../vulhub && pwd)
+   cat > .env <<EOF
+   SECRET_KEY=$(openssl rand -hex 32)
+   SERVER_HOST=$(hostname -I | awk '{print $1}')
+   VULHUB_HOST_PATH=$VULHUB
+   VULHUB_MOUNT=$VULHUB
+   EOF
+   ```
+3. **构建并启动、验证**：
 
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-# Ubuntu 用 ubuntu；Debian/Kali 用 debian
-REPO=ubuntu; CODENAME=$(. /etc/os-release; echo "${VERSION_CODENAME:-jammy}")
-curl -fsSL https://download.docker.com/linux/$REPO/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$REPO $CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-```
-
-CentOS / RHEL / Rocky / Alma / Oracle（dnf，Fedora 把 `centos` 换成 `fedora`）：
-
-```bash
-sudo dnf -y install dnf-plugins-core
-sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-```
-
-openSUSE / SLES（zypper）、Arch / Manjaro（pacman）、Alpine（apk）、Amazon Linux：
-
-```bash
-# openSUSE / SLES
-sudo zypper --non-interactive install docker
-# Arch / Manjaro
-sudo pacman -Sy --noconfirm docker
-# Alpine（OpenRC，非 systemd）
-sudo apk add --no-cache docker docker-cli-compose && sudo rc-update add docker boot && sudo service docker start
-# Amazon Linux 2/2023
-sudo dnf install -y docker || sudo amazon-linux-extras install -y docker
-# 非 Alpine 的上述系统启用守护进程：
-sudo systemctl enable --now docker
-```
-
-> 若发行版仓库里的 Docker **不含 compose v2 插件**（`docker compose version` 报错），从官方 Release 补齐：
-> ```bash
-> ARCH=$(uname -m); sudo mkdir -p /usr/local/lib/docker/cli-plugins
-> sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$ARCH" -o /usr/local/lib/docker/cli-plugins/docker-compose
-> sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-> ```
-
-> 官方便捷脚本 `curl -fsSL https://get.docker.com | sudo sh` 适用于大多数发行版，但**不支持 Kali**（Kali 请用上面的 apt 方式，走 Debian `bookworm` 源）。上面所有步骤 `deploy.sh` 都已自动处理，手动步骤仅供无法运行脚本时参考。
-
-**2) 配置 `.env`（关键：让 vulhub 在容器内外路径一致）**
-
-```bash
-cd range-platform
-VULHUB=$(cd ../vulhub && pwd)
-cat > .env <<EOF
-SECRET_KEY=$(openssl rand -hex 32)
-SERVER_HOST=$(hostname -I | awk '{print $1}')
-VULHUB_HOST_PATH=$VULHUB
-VULHUB_MOUNT=$VULHUB
-EOF
-```
-
-**3) 构建并启动、验证**
-
-```bash
-sudo docker compose up -d --build
-curl -s http://localhost:8000/api/health   # 应返回 status ok 与靶场数量
-```
+   ```bash
+   sudo docker compose up -d --build
+   curl -s http://localhost:8000/api/health   # 应返回 status ok 与靶场数量
+   ```
 
 ### 跨平台差异与注意事项
 

@@ -1,5 +1,9 @@
 # Vulhub Range Platform
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
 **语言 / Language**: **English** | [中文](README.zh-cn.md)
 
 A web-based platform for managing vulnerability ranges — browse, start, stop, and monitor local [vulhub](https://github.com/vulhub/vulhub) environments.
@@ -57,33 +61,25 @@ range-platform/
 - Docker Desktop (with `docker compose` enabled)
 - A sibling `vulhub/` directory (catalog source, configurable via `VULHUB_ROOT`); if missing, the `deploy` scripts will `git clone` it automatically.
 
-## Run the backend
+## Local development (optional)
+
+For development without Docker, run the backend and frontend separately:
 
 ```powershell
+# Backend -> http://127.0.0.1:8000 (API docs at /docs)
 cd range-platform/backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-
-# Create the config file (edit as needed)
 Copy-Item .env.example .env
-
-# Start the service (defaults to http://127.0.0.1:8000)
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
 
-On first launch the SQLite database is created and the admin account is initialized. API docs are at `http://127.0.0.1:8000/docs`.
-
-## Run the frontend
-
-```powershell
-cd range-platform/frontend
+# Frontend -> http://localhost:5173
+cd ../frontend
 npm install
-npm run dev     # dev mode, defaults to http://localhost:5173
+npm run dev        # production build: npm run build -> frontend/dist
 ```
 
-Production build: `npm run build`, output in `frontend/dist`.
-
-Open `http://localhost:5173` and log in with the default account.
+On first launch the SQLite database is created and the admin account is initialized.
 
 ## Docker deployment (single container)
 
@@ -179,7 +175,7 @@ Supported commands (identical across both scripts):
 
 ## One-click deployment (Linux / macOS / Windows)
 
-The platform image is **built locally on the target host** (`docker compose up -d --build` rebuilds it on that machine), so no build artifacts need to be migrated across operating systems — the image itself is based on Linux base images (node / python / docker-cli) run by the Docker engine, so there are no cross-platform binary compatibility issues. One-click scripts are provided for the three major systems:
+The image is **built locally on each host**, so nothing needs to be migrated across operating systems. One-click scripts are provided for the three major systems:
 
 | System | Script | Docker source |
 | ---- | ---- | ----------- |
@@ -210,20 +206,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 The script automatically: detects the distro → installs Docker and the compose plugin (and enables it at boot) if missing → generates `.env` (random `SECRET_KEY`, **random admin password**, auto-fills the host IP as `SERVER_HOST`, mounts vulhub at the **same path**) → runs `docker compose up -d --build` → prints the access URL, health-check command, and the **admin username/password generated this run, once** (record it immediately; afterwards it is only viewable in `.env`). Re-running is idempotent: an existing `.env` is not overwritten and the admin password does not change.
 
-Distros and install methods covered by the script:
-
-| Distro family | Representative systems | Install method |
-| -------- | -------- | -------- |
-| Debian family | Debian / Ubuntu / Kali / Linux Mint / Pop!_OS / Raspbian | apt + docker-ce official repo |
-| RHEL family | CentOS / RHEL / Rocky / Alma / Oracle Linux | dnf\|yum + docker-ce official repo |
-| Fedora | Fedora | dnf + docker-ce (fedora repo) |
-| Amazon Linux | Amazon Linux 2 / 2023 | dnf\|amazon-linux-extras\|yum |
-| SUSE family | openSUSE / SLES | zypper |
-| Arch family | Arch / Manjaro / EndeavourOS | pacman |
-| Alpine | Alpine | apk |
-| Other unknown distros | — | fall back to Docker's convenience script `get.docker.com` |
-
-Regardless of the install path, the script validates that `docker compose` is available at the end, and if the compose v2 plugin is missing it downloads the matching architecture (x86_64/aarch64/armv7/ppc64le/s390x) from GitHub Releases; when starting the Docker daemon it supports both systemd and OpenRC (Alpine).
+It auto-detects the distro and installs Docker + the compose v2 plugin — covering Debian/Ubuntu/Kali/Mint (apt), RHEL/CentOS/Rocky/Alma/Oracle/Fedora/Amazon Linux (dnf/yum), openSUSE/SLES (zypper), Arch/Manjaro (pacman) and Alpine (apk), falling back to `get.docker.com` for others. It fetches the compose plugin from GitHub Releases when missing and supports both systemd and OpenRC.
 
 > The random password only takes effect on **the first deployment (fresh database)** — the admin account is created according to `.env`'s `ADMIN_PASSWORD` when the backend first starts with an empty database; changing `.env` afterwards does not automatically change an existing account's password.
 
@@ -251,79 +234,29 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 > To change the password while **keeping existing data**, log in and change it under "User Management", or use the admin account's in-app password-change flow — do not use the `-v` command above, which wipes the entire database.
 
-### Option 2: manual steps (Linux)
+### Option 2: manual steps
 
-> Manual deployment on macOS / Windows is simpler: install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/), then under `range-platform/` follow [Docker deployment (single container)](#docker-deployment-single-container) and run `docker compose up -d --build` (`.env` can be created manually or via the one-click script).
+The one-click script automates everything below; use these only when the script cannot run.
 
-**1) Install Docker (pick one per distro)**
+1. **Install Docker + compose plugin** per the [official Docker docs](https://docs.docker.com/engine/install/) (Debian/Ubuntu/Kali via apt, RHEL/CentOS/Fedora via dnf, etc.), then `sudo systemctl enable --now docker`. On macOS / Windows just install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. **Create `.env`** (key: keep vulhub paths identical inside and outside the container):
 
-Ubuntu / Debian / Kali (apt; Kali uses the Debian `bookworm` repo):
+   ```bash
+   cd range-platform
+   VULHUB=$(cd ../vulhub && pwd)
+   cat > .env <<EOF
+   SECRET_KEY=$(openssl rand -hex 32)
+   SERVER_HOST=$(hostname -I | awk '{print $1}')
+   VULHUB_HOST_PATH=$VULHUB
+   VULHUB_MOUNT=$VULHUB
+   EOF
+   ```
+3. **Build, start, verify**:
 
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-# Ubuntu uses ubuntu; Debian/Kali use debian
-REPO=ubuntu; CODENAME=$(. /etc/os-release; echo "${VERSION_CODENAME:-jammy}")
-curl -fsSL https://download.docker.com/linux/$REPO/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$REPO $CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-```
-
-CentOS / RHEL / Rocky / Alma / Oracle (dnf; for Fedora replace `centos` with `fedora`):
-
-```bash
-sudo dnf -y install dnf-plugins-core
-sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-```
-
-openSUSE / SLES (zypper), Arch / Manjaro (pacman), Alpine (apk), Amazon Linux:
-
-```bash
-# openSUSE / SLES
-sudo zypper --non-interactive install docker
-# Arch / Manjaro
-sudo pacman -Sy --noconfirm docker
-# Alpine (OpenRC, not systemd)
-sudo apk add --no-cache docker docker-cli-compose && sudo rc-update add docker boot && sudo service docker start
-# Amazon Linux 2/2023
-sudo dnf install -y docker || sudo amazon-linux-extras install -y docker
-# For the non-Alpine systems above, enable the daemon:
-sudo systemctl enable --now docker
-```
-
-> If your distro's Docker package **lacks the compose v2 plugin** (`docker compose version` errors), add it from the official Release:
-> ```bash
-> ARCH=$(uname -m); sudo mkdir -p /usr/local/lib/docker/cli-plugins
-> sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$ARCH" -o /usr/local/lib/docker/cli-plugins/docker-compose
-> sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-> ```
-
-> The official convenience script `curl -fsSL https://get.docker.com | sudo sh` works on most distros but **does not support Kali** (use the apt method above with the Debian `bookworm` repo). `deploy.sh` handles all of the above automatically; the manual steps are only for reference when the script cannot run.
-
-**2) Configure `.env` (key: keep vulhub paths identical inside and outside the container)**
-
-```bash
-cd range-platform
-VULHUB=$(cd ../vulhub && pwd)
-cat > .env <<EOF
-SECRET_KEY=$(openssl rand -hex 32)
-SERVER_HOST=$(hostname -I | awk '{print $1}')
-VULHUB_HOST_PATH=$VULHUB
-VULHUB_MOUNT=$VULHUB
-EOF
-```
-
-**3) Build, start, verify**
-
-```bash
-sudo docker compose up -d --build
-curl -s http://localhost:8000/api/health   # should return status ok and the range count
-```
+   ```bash
+   sudo docker compose up -d --build
+   curl -s http://localhost:8000/api/health   # should return status ok and the range count
+   ```
 
 ### Cross-platform differences and caveats
 
