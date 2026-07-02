@@ -305,3 +305,12 @@ def is_running(env_path: str, project: str, compose_yaml: str) -> bool:
         if state == "running":
             return True
     return False
+
+
+def docker_available() -> bool:
+    """True if the host docker daemon responds (mounted socket is wired up)."""
+    try:
+        res = _run(["docker", "ps", "--format", "{{.ID}}"], timeout=15)
+    except DockerError:
+        return False
+    return res.ok

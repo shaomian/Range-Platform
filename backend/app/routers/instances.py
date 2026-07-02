@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..deps import get_current_user
 from ..models import Instance, User
 from ..schemas import InstanceCreate, InstanceOut, PortInfo
@@ -16,6 +17,8 @@ from ..services import docker_service as ds
 from ..services.catalog import catalog
 
 router = APIRouter(prefix="/api/instances", tags=["instances"])
+
+logger = logging.getLogger("range_platform")
 
 
 def _to_out(inst: Instance) -> InstanceOut:
@@ -200,3 +203,46 @@ def delete_instance(
     db.delete(inst)
     db.commit()
     return Response(status_code=204)
+
+
+def reconcile_on_startup() -> None:
+    """Resync DB "running" instances with the live docker daemon.
+
+    Platform-started containers carry no restart policy, so a host reboot
+    kills them while the DB keeps showing "running" -- the "我的实例" page then
+    lists dead instances as running. Called once at startup; verifies each
+    "running" instance with ``docker compose ps`` and flips dead ones to
+    "stopped" (clearing ports, setting stopped_at). Skipped when the docker
+    daemon isn't reachable yet, so we never mark stopped just because we
+    couldn't query docker.
+    """
+    if not ds.docker_available():
+        logger.warning(
+            "docker daemon not reachable at startup; skipping instance reconciliation"
+        )
+        return
+    db = SessionLocal()
+    try:
+        flipped = 0
+        for inst in db.query(Instance).filter(Instance.status == "running").all():
+            try:
+                alive = ds.is_running(
+                    inst.env_path, inst.project_name, inst.compose_yaml
+                )
+            except ds.DockerError:
+                continue
+            if alive:
+                continue
+            inst.status = "stopped"
+            inst.ports_json = "[]"
+            if inst.stopped_at is None:
+                inst.stopped_at = datetime.now(timezone.utc)
+            flipped += 1
+        if flipped:
+            db.commit()
+            logger.info(
+                "Reconciled %d stale running instance(s) to stopped on startup",
+                flipped,
+            )
+    finally:
+        db.close()

@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
         len(catalog.list()),
         settings.vulhub_path,
     )
+    instances.reconcile_on_startup()
     yield
 
 
