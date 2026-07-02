@@ -6,7 +6,6 @@ import os
 import random
 import re
 import secrets
-import socket
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -55,33 +54,51 @@ def unique_project_name(env_path: str) -> str:
     return f"{project_name_for(env_path)}_{secrets.token_hex(4)}"
 
 
-def _port_is_free(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            sock.bind(("0.0.0.0", port))
-            return True
-        except OSError:
-            return False
+def _host_published_ports() -> set[int]:
+    """Host ports currently published by ANY running container (host-daemon view).
+
+    The platform container drives the host docker daemon through the mounted
+    socket, so this sees ports opened by every container on the host -- including
+    ones started manually outside the platform. An in-container ``socket.bind``
+    probe cannot see those (different network namespace), which is exactly the
+    blind spot that previously caused "port already allocated" failures.
+    """
+    try:
+        res = _run(["docker", "ps", "--format", "{{.Ports}}"], timeout=30)
+    except DockerError:
+        return set()
+    if not res.ok:
+        return set()
+    occupied: set[int] = set()
+    for line in (res.stdout or "").splitlines():
+        for m in re.finditer(r":(\d+)->", line):
+            try:
+                occupied.add(int(m.group(1)))
+            except ValueError:
+                continue
+    return occupied
 
 
 def allocate_host_port(reserved: set[int]) -> int:
     """Pick a random free host port within the configured range.
 
     ``reserved`` accumulates ports handed out during the current allocation so
-    the same port is never assigned twice within one instance.
+    the same port is never assigned twice within one instance. We also query the
+    host docker daemon for every port already published by a running container;
+    that catches containers started manually outside the platform that the DB
+    ``reserved`` set (which only tracks platform-managed instances) would miss.
     """
     start, end = settings.port_range_start, settings.port_range_end
     if start > end:
         start, end = end, start
+    host_taken = _host_published_ports()
     candidates = list(range(start, end + 1))
     random.shuffle(candidates)
     for port in candidates:
-        if port in reserved:
+        if port in reserved or port in host_taken:
             continue
-        if _port_is_free(port):
-            reserved.add(port)
-            return port
+        reserved.add(port)
+        return port
     raise DockerError(
         f"no free host port available in range {start}-{end}"
     )
