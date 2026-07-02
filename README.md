@@ -1,236 +1,269 @@
-# Vulhub 靶场管理平台
+# Vulhub Range Platform
 
-基于 Web 的漏洞靶场管理平台，用于浏览、启动、停止和监控本地 [vulhub](https://github.com/vulhub/vulhub) 漏洞环境。
+**语言 / Language**: **English** | [中文](README.zh-cn.md)
 
-- **后端**：FastAPI + SQLAlchemy(SQLite) + JWT 鉴权，通过 `docker compose` 管理容器。
-- **前端**：Vue 3 + Vite + Element Plus + Pinia。
-- **功能**：多用户鉴权、靶场目录检索（名称/CVE/应用/标签）、README 与 compose 预览、一键启停、实时端口/访问地址、容器日志、用户管理、每用户并发实例限制。
-- **部署**：支持单容器 Docker 一键部署（`docker compose up -d --build`），并提供 **Linux / macOS（`deploy.sh`）与 Windows（`deploy.ps1`）一键部署脚本**，详见 [Docker 部署（单容器）](#docker-部署单容器) 与 [一键部署（Linux / macOS / Windows）](#一键部署linux--macos--windows)。
+A web-based platform for managing vulnerability ranges — browse, start, stop, and monitor local [vulhub](https://github.com/vulhub/vulhub) environments.
 
-## 目录结构
+- **Backend**: FastAPI + SQLAlchemy (SQLite) + JWT auth, driving containers via `docker compose`.
+- **Frontend**: Vue 3 + Vite + Element Plus + Pinia.
+- **Features**: multi-user auth, catalog search (name / CVE / app / tags), README & compose preview, one-click start/stop, live ports & access URLs, container logs, user management, per-user concurrent-instance limits.
+- **Deployment**: single-container Docker (`docker compose up -d --build`), plus one-click scripts for **Linux / macOS (`deploy.sh`) and Windows (`deploy.ps1`)** — see [Docker deployment (single container)](#docker-deployment-single-container) and [One-click deployment](#one-click-deployment-linux--macos--windows).
+
+## Quick Start
+
+Prerequisites: **Docker** and **docker compose** installed on the target host (if missing, the `deploy` scripts will try to install them automatically).
+
+```bash
+# 1. Clone this repository
+git clone https://github.com/shaomian/Range-Platform.git
+cd Range-Platform
+
+# 2. One-click deploy (auto: install Docker if missing, clone vulhub,
+#    generate random secret & admin password, build and start)
+#    Linux:   sudo ./deploy.sh
+#    macOS:   ./deploy.sh
+#    Windows: powershell -ExecutionPolicy Bypass -File .\deploy.ps1
+
+# 3. Open http://<host-ip>:8000 in a browser
+#    Log in with the admin username / password printed once at the end of the
+#    script (also available in .env)
+```
+
+Day-to-day operations (affect the platform container only):
+
+```bash
+./manage.sh restart     # restart the platform (Windows: .\manage.ps1 restart)
+./manage.sh pull        # git pull the vulhub catalog, then restart
+./manage.sh logs        # follow logs
+```
+
+> For manual, step-by-step deployment or cross-platform details, read on.
+
+## Project structure
 
 ```
 range-platform/
-├── backend/            # FastAPI 后端
-│   ├── app/            # 应用代码 (routers/services/models...)
+├── backend/            # FastAPI backend
+│   ├── app/            # application code (routers/services/models...)
 │   ├── requirements.txt
-│   └── .env.example    # 配置模板
-└── frontend/           # Vue3 前端
+│   └── .env.example    # config template
+└── frontend/           # Vue 3 frontend
 ```
 
-## 环境要求
+## Requirements
 
 - Python 3.10+
 - Node.js 18+
-- Docker Desktop（已启用 `docker compose`）
-- 同级目录下存在 `vulhub/`（靶场来源，可通过 `VULHUB_ROOT` 调整）；若缺失，`deploy` 脚本会自动 `git clone` 拉取
+- Docker Desktop (with `docker compose` enabled)
+- A sibling `vulhub/` directory (catalog source, configurable via `VULHUB_ROOT`); if missing, the `deploy` scripts will `git clone` it automatically.
 
-## 启动后端
+## Run the backend
 
 ```powershell
 cd range-platform/backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 
-# 生成配置文件（可按需修改）
+# Create the config file (edit as needed)
 Copy-Item .env.example .env
 
-# 启动服务（默认 http://127.0.0.1:8000）
+# Start the service (defaults to http://127.0.0.1:8000)
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-首次启动会自动创建 SQLite 数据库并初始化管理员账户。API 文档见 `http://127.0.0.1:8000/docs`。
+On first launch the SQLite database is created and the admin account is initialized. API docs are at `http://127.0.0.1:8000/docs`.
 
-## 启动前端
+## Run the frontend
 
 ```powershell
 cd range-platform/frontend
 npm install
-npm run dev     # 开发模式，默认 http://localhost:5173
+npm run dev     # dev mode, defaults to http://localhost:5173
 ```
 
-生产构建：`npm run build`，产物位于 `frontend/dist`。
+Production build: `npm run build`, output in `frontend/dist`.
 
-浏览器访问 `http://localhost:5173`，使用默认账户登录。
+Open `http://localhost:5173` and log in with the default account.
 
-## Docker 部署（单容器）
+## Docker deployment (single container)
 
-单容器方式由后端同时提供 API 与前端静态资源（同源，无需配置 CORS），并通过挂载宿主机 Docker 套接字（DooD）驱动宿主机的 Docker 守护进程来启停 vulhub 靶场。
+In single-container mode the backend serves both the API and the frontend static assets (same origin, no CORS needed), and drives the host's Docker daemon (DooD) to start/stop vulhub ranges by mounting the host Docker socket.
 
-前置条件：宿主机已安装 Docker 与 `docker compose`；同级目录存在 `vulhub/`（compose 默认以 `../vulhub` 作为挂载源，缺失时 `deploy` 脚本会自动 `git clone` 拉取）。
+Prerequisites: Docker and `docker compose` installed on the host; a sibling `vulhub/` directory (compose uses `../vulhub` as the mount source by default; the `deploy` scripts `git clone` it when missing).
 
 ```powershell
 cd range-platform
 docker compose up -d --build
 ```
 
-默认监听 `http://<宿主机>:8000`，使用[默认账户](#默认账户)登录。SQLite 数据库持久化在名为 `range-data` 的卷中，容器重建不会丢失数据。
+The platform listens on `http://<host>:8000` by default; log in with the [default account](#default-account). The SQLite database persists in a volume named `range-data`, so data survives container rebuilds.
 
-部署后可快速验证：
+Quick verification after deployment:
 
 ```powershell
-# 健康检查：返回 {"status":"ok","environments":<已加载靶场数>}
+# Health check: returns {"status":"ok","environments":<loaded range count>}
 Invoke-RestMethod http://localhost:8000/api/health
 
-# 查看容器状态与实时日志
+# Container status and live logs
 docker compose ps
 docker compose logs -f
 ```
 
-**可配置项**（可选，在 `range-platform/` 下创建 `.env` 覆盖）：
+**Configurable options** (optional, create `.env` under `range-platform/` to override):
 
-| 变量                     | 说明                             | 默认值            |
+| Variable | Description | Default |
 | ------------------------ | -------------------------------- | ----------------- |
-| `PLATFORM_PORT`          | 宿主机映射端口                   | 8000              |
-| `SECRET_KEY`             | JWT 签名密钥（生产必改）          | change-me...      |
-| `ADMIN_USERNAME`         | 初始管理员用户名                 | admin             |
-| `ADMIN_PASSWORD`         | 初始管理员密码                   | admin123          |
-| `SERVER_HOST`            | 生成访问地址时使用的主机         | localhost         |
-| `MAX_INSTANCES_PER_USER` | 普通用户最大并发实例数           | 3                 |
-| `PORT_RANGE_START`       | 实例端口随机分配范围（起始）     | 10000             |
-| `PORT_RANGE_END`         | 实例端口随机分配范围（结束）     | 12000             |
-| `CORS_ORIGINS`           | 额外允许的跨域来源（同源无需）   | 空                |
-| `VULHUB_HOST_PATH`       | 宿主机 vulhub 目录（挂载源）      | ../vulhub         |
-| `VULHUB_MOUNT`           | 容器内 vulhub 挂载路径            | /vulhub           |
+| `PLATFORM_PORT`          | Host port mapping               | 8000              |
+| `SECRET_KEY`             | JWT signing key (change in prod) | change-me...      |
+| `ADMIN_USERNAME`         | Initial admin username          | admin             |
+| `ADMIN_PASSWORD`         | Initial admin password          | admin123          |
+| `SERVER_HOST`            | Host used when building access URLs | localhost      |
+| `MAX_INSTANCES_PER_USER` | Max concurrent instances per normal user | 3        |
+| `PORT_RANGE_START`       | Instance port allocation range (start) | 10000      |
+| `PORT_RANGE_END`         | Instance port allocation range (end)   | 12000      |
+| `CORS_ORIGINS`           | Extra allowed CORS origins (not needed for same origin) | empty |
+| `VULHUB_HOST_PATH`       | Host vulhub directory (mount source) | ../vulhub    |
+| `VULHUB_MOUNT`           | vulhub mount path inside the container | /vulhub    |
 
-> `SERVER_HOST` 应设置为浏览器可访问到的地址（如服务器 IP 或域名），否则「访问地址」链接会指向 localhost。
+> `SERVER_HOST` should be an address the browser can reach (e.g. server IP or domain); otherwise the "access URL" links point to localhost.
 
-**关于绑定挂载的路径一致性（重要）**：靶场由宿主机 Docker 守护进程启动。若某个 vulhub 的 `docker-compose.yml` 使用相对路径 bind mount（如 `./conf:/etc/conf`），compose 会将其解析为容器内看到的路径再交给宿主机守护进程挂载，导致该路径在宿主机上不存在而启动失败。解决办法是让容器内挂载路径与宿主机绝对路径完全一致：
+**About bind-mount path consistency (important)**: ranges are started by the host Docker daemon. If a vulhub `docker-compose.yml` uses a relative bind mount (e.g. `./conf:/etc/conf`), compose resolves it to the path seen inside the container and hands that to the host daemon, which then fails because the path does not exist on the host. The fix is to make the in-container mount path identical to the host absolute path:
 
 ```powershell
-# 例：宿主机 vulhub 绝对路径为 /opt/vulhub
+# e.g. host vulhub absolute path is /opt/vulhub
 $env:VULHUB_HOST_PATH="/opt/vulhub"
 $env:VULHUB_MOUNT="/opt/vulhub"
 docker compose up -d --build
 ```
 
-多数仅构建镜像 / 映射端口的靶场无需此设置。
+Most ranges that only build images / map ports do not need this.
 
-更新平台（后端 / 前端代码变更后重建镜像并重启）：`docker compose up -d --build`。
+Update the platform (rebuild image and restart after backend/frontend code changes): `docker compose up -d --build`.
 
-停止平台：`docker compose down`（追加 `-v` 会一并删除 `range-data` 数据库卷）。
+Stop the platform: `docker compose down` (adding `-v` also deletes the `range-data` database volume).
 
-## 服务管理（启动 / 停止 / 重启）
+## Service management (start / stop / restart)
 
-部署完成后，可用管理脚本封装 `docker compose` 便捷地启停平台服务（**仅作用于平台容器**；运行中的 vulhub 靶场为独立 compose 项目，不受这些命令影响）。
+After deployment, use the management scripts to wrap `docker compose` for convenient start/stop of the platform service (**they affect the platform container only**; running vulhub ranges are independent compose projects and are not affected by these commands).
 
-**Linux / macOS（`manage.sh`）**：
+**Linux / macOS (`manage.sh`)**:
 
 ```bash
 cd range-platform
 chmod +x manage.sh
-./manage.sh restart      # 重启平台（Linux 会自动加 sudo）
+./manage.sh restart      # restart the platform (Linux adds sudo automatically)
 ```
 
-**Windows（`manage.ps1`）**：
+**Windows (`manage.ps1`)**:
 
 ```powershell
 cd range-platform
 powershell -ExecutionPolicy Bypass -File .\manage.ps1 restart
 ```
 
-支持的命令（两个脚本一致）：
+Supported commands (identical across both scripts):
 
-| 命令 | 说明 |
+| Command | Description |
 | ---- | ---- |
-| `start`           | 启动平台（容器不存在则创建，幂等） |
-| `stop`            | 停止平台容器（保留容器与数据卷） |
-| `restart`         | 重启平台容器 |
-| `status`（`ps`）  | 查看容器状态 |
-| `logs`            | 跟随平台日志（`--tail=200`，Ctrl-C 退出） |
-| `rebuild`（`update`）| 重建镜像并重启（后端/前端代码变更后使用） |
-| `down`            | 移除平台容器（保留 `range-data` 数据卷） |
-| `destroy`         | 移除容器并删除 `range-data` 卷（**会清空数据库**，需输入 `yes` 二次确认） |
+| `start`           | Start the platform (creates the container if absent; idempotent) |
+| `stop`            | Stop the platform container (keeps container and volume) |
+| `restart`         | Restart the platform container |
+| `status` (`ps`)   | Show container status |
+| `logs`            | Follow platform logs (`--tail=200`, Ctrl-C to exit) |
+| `pull`            | `git pull` the vulhub catalog, then restart (asks for y/N confirmation) |
+| `rebuild` (`update`) | Rebuild the image and restart (use after backend/frontend code changes) |
+| `down`            | Remove the platform container (keeps the `range-data` volume) |
+| `destroy`         | Remove the container and delete the `range-data` volume (**wipes the database**, requires typing `yes` to confirm) |
 
-> 更完整的功能与改动点清单见 [`CHECKLIST.md`](CHECKLIST.md)。
+> For a fuller feature and change list, see [`CHECKLIST.md`](CHECKLIST.md).
 
-## 一键部署（Linux / macOS / Windows）
+## One-click deployment (Linux / macOS / Windows)
 
-平台镜像在**目标主机上本地构建**（`docker compose up -d --build` 会在该机器重新构建），跨操作系统无需迁移构建产物——镜像本身基于 Linux 基础镜像（node / python / docker-cli），由 Docker 引擎负责运行，不存在跨平台二进制兼容问题。三大主流系统均提供一键脚本：
+The platform image is **built locally on the target host** (`docker compose up -d --build` rebuilds it on that machine), so no build artifacts need to be migrated across operating systems — the image itself is based on Linux base images (node / python / docker-cli) run by the Docker engine, so there are no cross-platform binary compatibility issues. One-click scripts are provided for the three major systems:
 
-| 系统 | 脚本 | Docker 来源 |
+| System | Script | Docker source |
 | ---- | ---- | ----------- |
-| Linux（各主流发行版）| `deploy.sh` | 脚本按发行版自动安装 Docker Engine + compose 插件 |
-| macOS | `deploy.sh` | Docker Desktop（缺失时经 Homebrew `brew install --cask docker` 安装并启动）|
-| Windows | `deploy.ps1` | Docker Desktop（缺失时经 `winget` 安装，需手动启动后重跑）|
+| Linux (major distros) | `deploy.sh` | Script auto-installs Docker Engine + compose plugin per distro |
+| macOS | `deploy.sh` | Docker Desktop (installed via Homebrew `brew install --cask docker` if missing) |
+| Windows | `deploy.ps1` | Docker Desktop (installed via `winget` if missing; start it manually, then re-run) |
 
-### 方式一：一键脚本（推荐）
+### Option 1: one-click script (recommended)
 
-**Linux / macOS** —— 将本仓库同步到主机后执行（脚本用 `uname` 识别系统；Linux 自动识别发行版选择安装方式）：
+**Linux / macOS** — sync this repository to the host and run (the script uses `uname` to detect the OS; on Linux it auto-detects the distro to choose the install method):
 
 ```bash
 cd range-platform
 chmod +x deploy.sh
-sudo ./deploy.sh      # macOS 无需 sudo：./deploy.sh
+sudo ./deploy.sh      # macOS: no sudo needed: ./deploy.sh
 ```
 
-> macOS 说明：脚本依赖 Docker Desktop。若未安装，会尝试 `brew install --cask docker`；安装后脚本会 `open -a Docker` 启动并等待守护进程就绪。macOS 上**不要用 sudo** 运行（Docker Desktop 以当前用户身份运行）。
+> macOS note: the script depends on Docker Desktop. If not installed, it tries `brew install --cask docker`; after install it runs `open -a Docker` and waits for the daemon to be ready. **Do not run with sudo on macOS** (Docker Desktop runs as the current user).
 
-**Windows** —— 在 PowerShell 中执行（需 Docker Desktop，WSL2 或 Hyper-V 后端）：
+**Windows** — run in PowerShell (requires Docker Desktop with the WSL2 or Hyper-V backend):
 
 ```powershell
 cd range-platform
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
-> Windows 说明：若未安装 Docker，脚本会用 `winget install -e --id Docker.DockerDesktop` 安装，随后请**手动启动 Docker Desktop 并完成首次初始化**，再重跑脚本。`deploy.ps1` 与 `deploy.sh` 行为一致：随机 `SECRET_KEY`/管理员密码、写 `.env`、`docker compose up -d --build`、一次性打印凭据。
+> Windows note: if Docker is not installed, the script installs it via `winget install -e --id Docker.DockerDesktop`; then **start Docker Desktop manually and complete first-time setup**, and re-run the script. `deploy.ps1` behaves the same as `deploy.sh`: random `SECRET_KEY`/admin password, write `.env`, `docker compose up -d --build`, and print credentials once.
 
-脚本会自动：检测发行版 → 缺失时安装 Docker 与 compose 插件并设为开机自启 → 生成 `.env`（随机 `SECRET_KEY`、**随机管理员密码**、自动填入本机 IP 作为 `SERVER_HOST`、把 vulhub 以**同路径**挂载）→ `docker compose up -d --build` → 输出访问地址、健康检查命令，并**一次性打印本次生成的管理员账号密码**（请立即记录，之后仅可在 `.env` 中查看）。重复执行是幂等的：已存在的 `.env` 不会被覆盖，管理员密码也不会改变。
+The script automatically: detects the distro → installs Docker and the compose plugin (and enables it at boot) if missing → generates `.env` (random `SECRET_KEY`, **random admin password**, auto-fills the host IP as `SERVER_HOST`, mounts vulhub at the **same path**) → runs `docker compose up -d --build` → prints the access URL, health-check command, and the **admin username/password generated this run, once** (record it immediately; afterwards it is only viewable in `.env`). Re-running is idempotent: an existing `.env` is not overwritten and the admin password does not change.
 
-脚本覆盖的发行版与安装方式：
+Distros and install methods covered by the script:
 
-| 发行版族 | 代表系统 | 安装方式 |
+| Distro family | Representative systems | Install method |
 | -------- | -------- | -------- |
-| Debian 系 | Debian / Ubuntu / Kali / Linux Mint / Pop!_OS / Raspbian | apt + docker-ce 官方源 |
-| RHEL 系 | CentOS / RHEL / Rocky / Alma / Oracle Linux | dnf\|yum + docker-ce 官方源 |
-| Fedora | Fedora | dnf + docker-ce（fedora 源）|
+| Debian family | Debian / Ubuntu / Kali / Linux Mint / Pop!_OS / Raspbian | apt + docker-ce official repo |
+| RHEL family | CentOS / RHEL / Rocky / Alma / Oracle Linux | dnf\|yum + docker-ce official repo |
+| Fedora | Fedora | dnf + docker-ce (fedora repo) |
 | Amazon Linux | Amazon Linux 2 / 2023 | dnf\|amazon-linux-extras\|yum |
-| SUSE 系 | openSUSE / SLES | zypper |
-| Arch 系 | Arch / Manjaro / EndeavourOS | pacman |
+| SUSE family | openSUSE / SLES | zypper |
+| Arch family | Arch / Manjaro / EndeavourOS | pacman |
 | Alpine | Alpine | apk |
-| 其它未知发行版 | — | 回退到 Docker 官方便捷脚本 `get.docker.com` |
+| Other unknown distros | — | fall back to Docker's convenience script `get.docker.com` |
 
-无论走哪条安装路径，脚本都会在最后校验 `docker compose` 是否可用，缺失 compose v2 插件时自动从 GitHub Releases 下载对应架构（x86_64/aarch64/armv7/ppc64le/s390x）的插件补齐；启动 Docker 守护进程时同时兼容 systemd 与 OpenRC（Alpine）。
+Regardless of the install path, the script validates that `docker compose` is available at the end, and if the compose v2 plugin is missing it downloads the matching architecture (x86_64/aarch64/armv7/ppc64le/s390x) from GitHub Releases; when starting the Docker daemon it supports both systemd and OpenRC (Alpine).
 
-> 随机密码仅在**首次部署（数据库为全新）**时生效——管理员账户在后端首次启动、数据库为空时按 `.env` 中的 `ADMIN_PASSWORD` 创建；此后即使修改 `.env` 也不会自动改动已存在账户的密码。
+> The random password only takes effect on **the first deployment (fresh database)** — the admin account is created according to `.env`'s `ADMIN_PASSWORD` when the backend first starts with an empty database; changing `.env` afterwards does not automatically change an existing account's password.
 
-### 重置随机管理员密码
+### Reset the random admin password
 
-由于后端仅在**数据库为空**时才按 `.env` 的 `ADMIN_PASSWORD` 创建管理员，直接改 `.env` 里的密码并重启**不会**改动已存在账户。若要让脚本重新生成一个随机密码，需要连同数据库卷一起清空后重跑：
+Because the backend only creates the admin from `.env`'s `ADMIN_PASSWORD` when **the database is empty**, editing the password in `.env` and restarting **does not** change an existing account. To have the script generate a new random password, you must wipe the database volume and re-run:
 
-Linux / macOS：
+Linux / macOS:
 
 ```bash
 cd range-platform
-sudo docker compose down -v   # macOS 去掉 sudo；-v 会删除 range-data 卷（含 SQLite 数据库），账户/实例记录一并清除
-rm -f .env                    # 删除旧 .env，让脚本重新生成随机 SECRET_KEY 与随机管理员密码
-sudo ./deploy.sh              # 重新部署，结束时会再次一次性打印新的管理员账号密码
+sudo docker compose down -v   # macOS: drop sudo; -v deletes the range-data volume (SQLite DB), clearing accounts/instances
+rm -f .env                    # remove the old .env so the script regenerates a random SECRET_KEY and admin password
+sudo ./deploy.sh              # redeploy; the new admin credentials are printed once at the end
 ```
 
-Windows（PowerShell）：
+Windows (PowerShell):
 
 ```powershell
 cd range-platform
-docker compose down -v        # 删除 range-data 卷（含数据库）
+docker compose down -v        # delete the range-data volume (with the DB)
 Remove-Item .env -ErrorAction SilentlyContinue
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
-> 若只想改密码而**保留现有数据**，请登录平台后在「用户管理」中修改，或用管理员账户走应用内的改密流程——不要用上面的 `-v` 命令，那会清空整个数据库。
+> To change the password while **keeping existing data**, log in and change it under "User Management", or use the admin account's in-app password-change flow — do not use the `-v` command above, which wipes the entire database.
 
-### 方式二：手动步骤（Linux）
+### Option 2: manual steps (Linux)
 
-> macOS / Windows 手动部署更简单：安装并启动 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后在 `range-platform/` 下参照 [Docker 部署（单容器）](#docker-部署单容器) 执行 `docker compose up -d --build` 即可（`.env` 可手动创建或直接用一键脚本生成）。
+> Manual deployment on macOS / Windows is simpler: install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/), then under `range-platform/` follow [Docker deployment (single container)](#docker-deployment-single-container) and run `docker compose up -d --build` (`.env` can be created manually or via the one-click script).
 
-**1) 安装 Docker（按发行版任选其一）**
+**1) Install Docker (pick one per distro)**
 
-Ubuntu / Debian / Kali（apt，Kali 使用 Debian `bookworm` 源）：
+Ubuntu / Debian / Kali (apt; Kali uses the Debian `bookworm` repo):
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
-# Ubuntu 用 ubuntu；Debian/Kali 用 debian
+# Ubuntu uses ubuntu; Debian/Kali use debian
 REPO=ubuntu; CODENAME=$(. /etc/os-release; echo "${VERSION_CODENAME:-jammy}")
 curl -fsSL https://download.docker.com/linux/$REPO/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$REPO $CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list
@@ -239,7 +272,7 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo systemctl enable --now docker
 ```
 
-CentOS / RHEL / Rocky / Alma / Oracle（dnf，Fedora 把 `centos` 换成 `fedora`）：
+CentOS / RHEL / Rocky / Alma / Oracle (dnf; for Fedora replace `centos` with `fedora`):
 
 ```bash
 sudo dnf -y install dnf-plugins-core
@@ -248,31 +281,31 @@ sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo systemctl enable --now docker
 ```
 
-openSUSE / SLES（zypper）、Arch / Manjaro（pacman）、Alpine（apk）、Amazon Linux：
+openSUSE / SLES (zypper), Arch / Manjaro (pacman), Alpine (apk), Amazon Linux:
 
 ```bash
 # openSUSE / SLES
 sudo zypper --non-interactive install docker
 # Arch / Manjaro
 sudo pacman -Sy --noconfirm docker
-# Alpine（OpenRC，非 systemd）
+# Alpine (OpenRC, not systemd)
 sudo apk add --no-cache docker docker-cli-compose && sudo rc-update add docker boot && sudo service docker start
 # Amazon Linux 2/2023
 sudo dnf install -y docker || sudo amazon-linux-extras install -y docker
-# 非 Alpine 的上述系统启用守护进程：
+# For the non-Alpine systems above, enable the daemon:
 sudo systemctl enable --now docker
 ```
 
-> 若发行版仓库里的 Docker **不含 compose v2 插件**（`docker compose version` 报错），从官方 Release 补齐：
+> If your distro's Docker package **lacks the compose v2 plugin** (`docker compose version` errors), add it from the official Release:
 > ```bash
 > ARCH=$(uname -m); sudo mkdir -p /usr/local/lib/docker/cli-plugins
 > sudo curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$ARCH" -o /usr/local/lib/docker/cli-plugins/docker-compose
 > sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 > ```
 
-> 官方便捷脚本 `curl -fsSL https://get.docker.com | sudo sh` 适用于大多数发行版，但**不支持 Kali**（Kali 请用上面的 apt 方式，走 Debian `bookworm` 源）。上面所有步骤 `deploy.sh` 都已自动处理，手动步骤仅供无法运行脚本时参考。
+> The official convenience script `curl -fsSL https://get.docker.com | sudo sh` works on most distros but **does not support Kali** (use the apt method above with the Debian `bookworm` repo). `deploy.sh` handles all of the above automatically; the manual steps are only for reference when the script cannot run.
 
-**2) 配置 `.env`（关键：让 vulhub 在容器内外路径一致）**
+**2) Configure `.env` (key: keep vulhub paths identical inside and outside the container)**
 
 ```bash
 cd range-platform
@@ -285,72 +318,72 @@ VULHUB_MOUNT=$VULHUB
 EOF
 ```
 
-**3) 构建并启动、验证**
+**3) Build, start, verify**
 
 ```bash
 sudo docker compose up -d --build
-curl -s http://localhost:8000/api/health   # 应返回 status ok 与靶场数量
+curl -s http://localhost:8000/api/health   # should return status ok and the range count
 ```
 
-### 跨平台差异与注意事项
+### Cross-platform differences and caveats
 
-- **镜像在目标机重建，无产物迁移**：每台主机各自 `docker compose up -d --build`，不依赖其它系统的构建产物，避免跨平台二进制问题。
-- **bind mount 路径一致性（最重要，分系统）**：靶场由宿主机 Docker 守护进程启动，使用相对 bind mount（如 `./conf:/etc/conf`）的 vulhub 需要容器内路径与守护进程可解析的宿主机路径一致。
-  - **Linux**：把 vulhub 以**相同绝对路径**挂载即可完全兼容（脚本已自动处理：`VULHUB_HOST_PATH=VULHUB_MOUNT=<绝对路径>`）。
-  - **macOS**：同样可做到一致——将 `VULHUB_MOUNT` 设为该 vulhub 在 Mac 上的绝对路径（如 `/Users/you/.../vulhub`，并确保它在 Docker Desktop 的 File Sharing 范围内），`deploy.sh` 已按此处理。
-  - **Windows**：宿主机路径是 `C:\...`，无法等同于容器内的 Linux 路径，因此**使用相对 bind mount 的靶场可能无法启动**；`deploy.ps1` 默认 `VULHUB_MOUNT=/vulhub`。**仅做端口映射**的靶场（大多数）不受影响，可正常启停。
-- **Docker 套接字 / 引擎**：Linux 平台容器以 root 运行，直接访问 `/var/run/docker.sock`；macOS / Windows 由 Docker Desktop 提供该套接字，DooD 同样可用。
-- **SELinux（CentOS/RHEL）**：enforcing 模式下，容器读取挂载目录或访问 docker.sock 可能被拒绝。若健康检查 `environments` 为 0 或日志出现 `permission denied`，执行 `sudo chcon -Rt container_file_t <vulhub 绝对路径>`；测试环境仍不行时可临时 `sudo setenforce 0`。
-- **防火墙**：放行平台端口与各靶场端口。ufw：`sudo ufw allow 8000/tcp`；firewalld：`sudo firewall-cmd --add-port=8000/tcp --permanent && sudo firewall-cmd --reload`。
-- **构建网络**：构建需访问 Docker Hub / npm / PyPI。受限网络请配置代理或镜像源；`npm ci` 偶发网络中断时，重试 `sudo docker compose build` 即可。
-- **行尾必须为 LF**：`deploy.sh` 与 vulhub 的 `docker-compose.yml` 需为 LF 换行。若经 Windows 传输变成 CRLF，用 `sed -i 's/\r$//' deploy.sh` 修复。
+- **Image rebuilt on the target host, no artifact migration**: each host runs `docker compose up -d --build` independently, not relying on another system's build artifacts, avoiding cross-platform binary issues.
+- **bind-mount path consistency (most important, per system)**: ranges are started by the host Docker daemon; vulhub environments using relative bind mounts (e.g. `./conf:/etc/conf`) require the in-container path to match a host path the daemon can resolve.
+  - **Linux**: mounting vulhub at the **same absolute path** is fully compatible (the script handles this: `VULHUB_HOST_PATH=VULHUB_MOUNT=<abs path>`).
+  - **macOS**: consistency is also achievable — set `VULHUB_MOUNT` to vulhub's absolute path on the Mac (e.g. `/Users/you/.../vulhub`, ensuring it is within Docker Desktop's File Sharing scope); `deploy.sh` handles this.
+  - **Windows**: the host path is `C:\...` and cannot equal a Linux path inside the container, so **ranges using relative bind mounts may fail to start**; `deploy.ps1` defaults to `VULHUB_MOUNT=/vulhub`. Ranges that **only map ports** (most of them) are unaffected and start normally.
+- **Docker socket / engine**: on Linux the platform container runs as root and accesses `/var/run/docker.sock` directly; on macOS / Windows Docker Desktop provides the socket, and DooD works the same.
+- **SELinux (CentOS/RHEL)**: in enforcing mode the container may be denied when reading the mounted directory or accessing docker.sock. If the health check shows `environments` = 0 or logs show `permission denied`, run `sudo chcon -Rt container_file_t <vulhub abs path>`; if a test environment still fails, temporarily `sudo setenforce 0`.
+- **Firewall**: open the platform port and each range's ports. ufw: `sudo ufw allow 8000/tcp`; firewalld: `sudo firewall-cmd --add-port=8000/tcp --permanent && sudo firewall-cmd --reload`.
+- **Build network**: building needs access to Docker Hub / npm / PyPI. On restricted networks configure a proxy or mirrors; if `npm ci` hits an occasional network drop, retry `sudo docker compose build`.
+- **Line endings must be LF**: `deploy.sh` and vulhub `docker-compose.yml` files must use LF. If transferred via Windows and turned into CRLF, fix with `sed -i 's/\r$//' deploy.sh`.
 
-## 默认账户
+## Default account
 
-| 用户名 | 密码       | 角色  |
+| Username | Password | Role |
 | ------ | ---------- | ----- |
-| admin  | admin123   | 管理员 |
+| admin  | admin123   | admin |
 
-> 上表为本地开发/手动部署（未设置 `ADMIN_PASSWORD` 时）的默认凭据。**使用 `deploy.sh` 一键部署时，管理员密码为随机生成**，请以脚本结束时打印的（或 `.env` 中 `ADMIN_PASSWORD` 的）值为准。
+> The table above is the default credential for local development / manual deployment (when `ADMIN_PASSWORD` is not set). **When deploying via `deploy.sh`, the admin password is randomly generated** — use the value printed at the end of the script (or `ADMIN_PASSWORD` in `.env`).
 >
-> 生产环境请务必修改 `.env` 中的 `SECRET_KEY`、`ADMIN_PASSWORD`。
+> In production, be sure to change `SECRET_KEY` and `ADMIN_PASSWORD` in `.env`.
 
-## 主要配置项（backend/.env）
+## Main configuration (backend/.env)
 
-| 变量                     | 说明                                   | 默认值                    |
+| Variable | Description | Default |
 | ------------------------ | -------------------------------------- | ------------------------- |
-| `SECRET_KEY`             | JWT 签名密钥（务必修改）                | change-me...              |
-| `DATABASE_URL`           | 数据库连接                             | sqlite:///./range_platform.db |
-| `VULHUB_ROOT`            | vulhub 目录路径（相对 backend/）        | ../../vulhub              |
-| `SERVER_HOST`            | 生成访问地址时使用的主机               | localhost                 |
-| `ADMIN_USERNAME`         | 初始管理员用户名                       | admin                     |
-| `ADMIN_PASSWORD`         | 初始管理员密码                         | admin123                  |
-| `MAX_INSTANCES_PER_USER` | 普通用户最大并发运行实例数             | 3                         |
-| `CORS_ORIGINS`           | 允许的前端来源（逗号分隔）             | http://localhost:5173,... |
+| `SECRET_KEY`             | JWT signing key (must change)          | change-me...              |
+| `DATABASE_URL`           | Database connection                    | sqlite:///./range_platform.db |
+| `VULHUB_ROOT`            | vulhub directory path (relative to backend/) | ../../vulhub        |
+| `SERVER_HOST`            | Host used when building access URLs    | localhost                 |
+| `ADMIN_USERNAME`         | Initial admin username                 | admin                     |
+| `ADMIN_PASSWORD`         | Initial admin password                 | admin123                  |
+| `MAX_INSTANCES_PER_USER` | Max concurrent running instances per normal user | 3               |
+| `CORS_ORIGINS`           | Allowed frontend origins (comma-separated) | http://localhost:5173,... |
 
-## 使用流程
+## Usage flow
 
-1. 登录后进入 **靶场列表**，可按名称 / CVE / 应用 / 标签搜索筛选。
-2. 点击 **详情** 查看 README 与 `docker-compose.yml`。
-3. 点击 **启动**，平台执行 `docker compose up -d` 并返回访问地址（宿主机端口）。
-4. 在 **我的实例** 中查看状态、访问地址、日志，或停止 / 删除实例。
-5. 管理员可在 **用户管理** 中创建 / 编辑 / 禁用用户，并查看所有用户的实例。
+1. After logging in, go to the **range list** and filter by name / CVE / app / tags.
+2. Click **Details** to view the README and `docker-compose.yml`.
+3. Click **Start**; the platform runs `docker compose up -d` and returns the access URL (host port).
+4. In **My Instances**, view status, access URL, and logs, or stop / delete instances.
+5. Admins can create / edit / disable users under **User Management** and view all users' instances.
 
-## 添加与维护靶场
+## Adding and maintaining ranges
 
-一个靶场能被平台使用，取决于两处：`environments.toml` 中登记的条目（决定能否被检索到）+ 对应目录下的 `docker-compose.yml`（决定能否启动）。
+Whether a range is usable depends on two things: an entry registered in `environments.toml` (determines discoverability) + a `docker-compose.yml` in the corresponding directory (determines whether it can start).
 
-**同步官方 vulhub 新环境**：
+**Sync new environments from official vulhub**:
 
 ```powershell
 cd vulhub
 git pull
 ```
 
-**添加自定义靶场**（遵循 vulhub 约定：软件目录小写、CVE 目录大写、文件名必须 `docker-compose.yml`、LF 换行）：
+**Add a custom range** (follow vulhub conventions: lowercase software directory, uppercase CVE directory, file name must be `docker-compose.yml`, LF line endings):
 
-1. 在 `VULHUB_ROOT` 下创建目录（如 `myapp/CVE-2025-0001/`）并放入 `docker-compose.yml`（可选 `README.md` / `README.zh-cn.md`）。
-2. 在 `environments.toml` 末尾追加条目，`path` 必须与目录相对路径一致：
+1. Create a directory under `VULHUB_ROOT` (e.g. `myapp/CVE-2025-0001/`) and add a `docker-compose.yml` (optional `README.md` / `README.zh-cn.md`).
+2. Append an entry at the end of `environments.toml`; `path` must match the directory's relative path:
 
    ```toml
    [[environment]]
@@ -361,14 +394,14 @@ git pull
    tags = ["RCE"]
    ```
 
-   > `tags` 建议取自文件顶部 `tags = [...]` 中已定义的值，否则不会出现在筛选下拉框里。
+   > `tags` should preferably come from values already defined in the top-level `tags = [...]`, otherwise they will not appear in the filter dropdown.
 
-**刷新目录（热重载）**：目录为内存缓存。修改上述内容后，管理员在 **靶场列表** 页点击「刷新目录」按钮即可生效，无需重启后端（等价接口：`POST /api/environments/reload`，仅管理员）。
+**Refresh the catalog (hot reload)**: the catalog is cached in memory. After changing the above, an admin can click the "Refresh catalog" button on the **range list** page to apply changes without restarting the backend (equivalent endpoint: `POST /api/environments/reload`, admin only).
 
-## 说明与注意
+## Notes and caveats
 
-- 每次启动都会生成唯一的 compose 项目名，并把靶场 `docker-compose.yml` 声明的宿主机端口重映射到 `PORT_RANGE_START`~`PORT_RANGE_END` 范围内的随机空闲端口；因此多个用户（或同一靶场多次启动）可并发运行、互不冲突，不再出现「Environment is already running」。启动后仍从 `docker compose ps` 读取实际映射端口。
-- 每个实例都是独立、全新的容器与卷；停止实例执行 `docker compose down -v`，会移除该实例的容器、网络与卷，不会残留上一次测试的数据。
-- 部分靶场镜像（如旧版 nginx）不向 stdout 输出日志，日志面板可能为空，属正常现象。
-- 若某靶场在 `docker-compose.yml` 中固定了自定义网络子网（`ipam` 固定 subnet）等全局唯一资源，多实例并发时可能仍会冲突，属个别靶场的固有限制。
-- Windows 下已针对 `docker` 子进程输出统一使用 UTF-8 解码，避免 GBK 编码报错。
+- Every start generates a unique compose project name and remaps the host ports declared in the range's `docker-compose.yml` to random free ports within `PORT_RANGE_START`–`PORT_RANGE_END`; therefore multiple users (or the same range started multiple times) can run concurrently without conflict, and "Environment is already running" no longer occurs. Actual mapped ports are still read from `docker compose ps` after start.
+- Each instance is an independent, brand-new set of containers and volumes; stopping an instance runs `docker compose down -v`, removing that instance's containers, networks, and volumes, leaving no leftover data from the previous test.
+- Some range images (e.g. older nginx) do not write logs to stdout, so the log panel may be empty — this is normal.
+- If a range pins a globally unique resource such as a custom network subnet (`ipam` fixed subnet) in its `docker-compose.yml`, concurrent instances may still conflict — an inherent limitation of that particular range.
+- On Windows, `docker` subprocess output is decoded uniformly as UTF-8 to avoid GBK encoding errors.
