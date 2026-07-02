@@ -1,0 +1,20 @@
+# Frontend
+frontend/node_modules
+frontend/dist
+
+# Backend
+backend/.venv
+backend/**/__pycache__
+backend/*.db
+backend/.env
+
+# Deployment (not needed inside the image)
+.env
+deploy.sh
+deploy.ps1
+
+# Misc
+**/*.pyc
+.git
+.gitignore
+README.md

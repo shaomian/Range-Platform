@@ -1,0 +1,51 @@
+# Single-container deployment for the Vulhub Range Platform.
+#
+# The backend serves both the API and the compiled frontend (same origin, so no
+# CORS is required) and drives the *host* Docker daemon via the mounted socket
+# (Docker-out-of-Docker) to start/stop vulhub targets.
+#
+# Quick start (from the range-platform/ directory):
+#   docker compose up -d --build
+#
+# Override any of the ${VAR:-default} values via a .env file placed next to this
+# compose file, or via shell environment variables. See README.md for details.
+
+services:
+  range-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: range-platform:latest
+    container_name: range-platform
+    restart: unless-stopped
+    ports:
+      - "${PLATFORM_PORT:-8000}:8000"
+    environment:
+      # JWT signing key. CHANGE THIS in production.
+      SECRET_KEY: "${SECRET_KEY:-change-me-to-a-random-secret-string}"
+      # Host used when building access URLs shown to users (e.g. server IP/domain).
+      SERVER_HOST: "${SERVER_HOST:-localhost}"
+      # Initial admin account created on first startup.
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      # Max concurrent running instances per normal user.
+      MAX_INSTANCES_PER_USER: "${MAX_INSTANCES_PER_USER:-3}"
+      # Host port range (inclusive) used to randomly map each instance's ports.
+      PORT_RANGE_START: "${PORT_RANGE_START:-10000}"
+      PORT_RANGE_END: "${PORT_RANGE_END:-12000}"
+      # Frontend is served same-origin; leave empty to allow no cross-origin.
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      # vulhub catalog path as seen inside the container (see volumes below).
+      VULHUB_ROOT: "${VULHUB_MOUNT:-/vulhub}"
+    volumes:
+      # Drive the host Docker daemon to manage vulhub targets (DooD).
+      - /var/run/docker.sock:/var/run/docker.sock
+      # vulhub catalog source. For targets that use relative bind mounts,
+      # mount it at an identical host path by setting VULHUB_HOST_PATH and
+      # VULHUB_MOUNT to the same absolute path (see README.md).
+      - "${VULHUB_HOST_PATH:-../vulhub}:${VULHUB_MOUNT:-/vulhub}"
+      # Persist the SQLite database across container restarts.
+      - range-data:/data
+
+volumes:
+  range-data:
