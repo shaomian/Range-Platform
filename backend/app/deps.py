@@ -1,7 +1,7 @@
 """Shared FastAPI dependencies for authentication/authorization."""
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -18,10 +18,9 @@ _CREDENTIALS_EXC = HTTPException(
 )
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> User:
+def _resolve_user(token: str | None, db: Session) -> User:
+    if not token:
+        raise _CREDENTIALS_EXC
     payload = decode_access_token(token)
     if payload is None:
         raise _CREDENTIALS_EXC
@@ -32,6 +31,24 @@ def get_current_user(
     if user is None or not user.is_active:
         raise _CREDENTIALS_EXC
     return user
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    return _resolve_user(token, db)
+
+
+def get_current_user_or_query(
+    authorization: str | None = Header(None),
+    token: str | None = Query(None),
+    db: Session = Depends(get_db),
+) -> User:
+    bearer: str | None = None
+    if authorization and authorization.lower().startswith("bearer "):
+        bearer = authorization[7:]
+    return _resolve_user(bearer or token, db)
 
 
 def require_admin(current: User = Depends(get_current_user)) -> User:

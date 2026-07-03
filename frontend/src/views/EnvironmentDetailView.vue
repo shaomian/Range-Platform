@@ -37,7 +37,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import { ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { envApi, instanceApi } from '../api'
@@ -48,8 +48,28 @@ const starting = ref(false)
 const detail = ref(null)
 const tab = ref('readme')
 
+const md = new Marked({
+  renderer: {
+    image({ href, title, text }) {
+      let src = href || ''
+      if (src && !/^(https?:)?\/\//i.test(src) && !src.startsWith('data:')) {
+        const base = `/api/environments/${route.params.path}/raw/`
+        src = base + src.replace(/^\.?\//, '')
+        const token = localStorage.getItem('token')
+        if (token) {
+          src += (src.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)
+        }
+      }
+      let out = `<img src="${src}" alt="${text || ''}"`
+      if (title) out += ` title="${title}"`
+      out += '>'
+      return out
+    },
+  },
+})
+
 const renderedReadme = computed(() =>
-  detail.value?.readme ? marked.parse(detail.value.readme) : '<p>暂无说明文档</p>'
+  detail.value?.readme ? md.parse(detail.value.readme) : '<p>暂无说明文档</p>'
 )
 
 async function load() {
