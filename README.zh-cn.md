@@ -1,5 +1,9 @@
 # Vulhub 靶场管理平台
 
+<p align="center">
+  <img src=".github/assets/banner.png" alt="Vulhub 靶场管理平台" height="auto" />
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
@@ -10,7 +14,7 @@
 
 - **后端**：FastAPI + SQLAlchemy(SQLite) + JWT 鉴权，通过 `docker compose` 管理容器。
 - **前端**：Vue 3 + Vite + Element Plus + Pinia。
-- **功能**：多用户鉴权、靶场目录检索（名称/CVE/应用/标签）、README 与 compose 预览、一键启停、实时端口/访问地址、容器日志、用户管理、每用户并发实例限制。
+- **功能**：多用户鉴权、靶场目录检索（名称/CVE/应用/标签）、README 与 compose 预览、一键启停、实时端口/访问地址、容器日志、用户管理、每用户并发实例限制、**实例超时自动停止（页面实时倒计时）+ 手动续期 + 管理员可配置超时时间**。
 - **部署**：支持单容器 Docker 一键部署（`docker compose up -d --build`），并提供 **Linux / macOS（`deploy.sh`）与 Windows（`deploy.ps1`）一键部署脚本**，详见 [Docker 部署（单容器）](#docker-部署单容器) 与 [一键部署（Linux / macOS / Windows）](#一键部署linux--macos--windows)。
 
 ## 快速开始（Quick Start）
@@ -115,6 +119,8 @@ docker compose logs -f
 | `MAX_INSTANCES_PER_USER` | 普通用户最大并发实例数           | 3                 |
 | `PORT_RANGE_START`       | 实例端口随机分配范围（起始）     | 10000             |
 | `PORT_RANGE_END`         | 实例端口随机分配范围（结束）     | 12000             |
+| `INSTANCE_DEFAULT_TTL_MINUTES` | 实例默认超时时间（分钟）；首次启动写入数据库，之后管理员可在「系统设置」中在线调整 | 60  |
+| `INSTANCE_MAX_TTL_MINUTES`     | 普通用户单次续期上限（分钟）；首次启动写入数据库，之后管理员可在线调整 | 1440 |
 | `CORS_ORIGINS`           | 额外允许的跨域来源（同源无需）   | 空                |
 | `VULHUB_HOST_PATH`       | 宿主机 vulhub 目录（挂载源）      | ../vulhub         |
 | `VULHUB_MOUNT`           | 容器内 vulhub 挂载路径            | /vulhub           |
@@ -289,6 +295,8 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 | `ADMIN_USERNAME`         | 初始管理员用户名                       | admin                     |
 | `ADMIN_PASSWORD`         | 初始管理员密码                         | admin123                  |
 | `MAX_INSTANCES_PER_USER` | 普通用户最大并发运行实例数             | 3                         |
+| `INSTANCE_DEFAULT_TTL_MINUTES` | 实例默认超时时间（分钟）。首次启动写入数据库，之后管理员可在「系统设置」中在线调整，无需重启 | 60  |
+| `INSTANCE_MAX_TTL_MINUTES`     | 普通用户单次续期上限（分钟）。首次启动写入数据库，之后管理员可在线调整 | 1440 |
 | `CORS_ORIGINS`           | 允许的前端来源（逗号分隔）             | http://localhost:5173,... |
 
 ## 使用流程
@@ -296,8 +304,18 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 1. 登录后进入 **靶场列表**，可按名称 / CVE / 应用 / 标签搜索筛选。
 2. 点击 **详情** 查看 README 与 `docker-compose.yml`。
 3. 点击 **启动**，平台执行 `docker compose up -d` 并返回访问地址（宿主机端口）。
-4. 在 **我的实例** 中查看状态、访问地址、日志，或停止 / 删除实例。
-5. 管理员可在 **用户管理** 中创建 / 编辑 / 禁用用户，并查看所有用户的实例。
+4. 在 **我的实例** 中查看状态、访问地址、日志，或停止 / 删除实例。每个运行中实例显示**实时倒计时**到自动停止时刻；点击 **续期** 可延后截止时间（普通用户受配置的最大续期时长约束）。
+5. 管理员可在 **用户管理** 中创建 / 编辑 / 禁用用户，并查看所有用户的实例；在 **系统设置** 中可调整默认超时时间与最大续期时长。
+
+## 实例超时自动停止与续期
+
+为避免测试完成后忘记关闭环境，每个启动的实例都会被赋予一个自动停止截止时刻（`expires_at` = 启动时间 + 默认超时时长）：
+
+- 后台有清理任务每 15 秒扫描一次，凡运行中实例超过截止时刻即执行 `docker compose down -v`（与手动停止一致）并标记为已停止。
+- **我的实例** 页面按秒显示**倒计时**（不足 5 分钟变橙、不足 1 分钟变红），并每 30 秒自动刷新列表，自动停止后无需手动刷新即可看到状态变化。
+- **续期**：在运行中实例上点击 **续期**，选择分钟数，截止时刻将重置为「当前时刻 + N 分钟」。普通用户单次续期时长受管理员配置的最大值约束；管理员可输入任意正数。
+- **管理员配置**：在 **系统设置** 页面可调整 **默认超时时间**（作用于新启动的实例）与 **最大续期时长**（约束普通用户）。配置存入数据库、即时生效，无需重启。环境变量 `INSTANCE_DEFAULT_TTL_MINUTES` / `INSTANCE_MAX_TTL_MINUTES` 仅作为首次启动的初始值。
+- 已在运行的实例在配置变更后仍保留原 `expires_at`，用户可按需通过 **续期** 延长。
 
 ## 添加与维护靶场
 

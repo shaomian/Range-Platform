@@ -35,13 +35,36 @@ def _run_migrations() -> None:
     must be added manually for databases created by older versions.
     """
     insp = inspect(engine)
-    if "instances" not in insp.get_table_names():
-        return
-    columns = {c["name"] for c in insp.get_columns("instances")}
-    if "compose_yaml" not in columns:
+    tables = set(insp.get_table_names())
+
+    if "instances" in tables:
+        columns = {c["name"] for c in insp.get_columns("instances")}
+        if "compose_yaml" not in columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE instances ADD COLUMN compose_yaml TEXT DEFAULT ''")
+                )
+        if "expires_at" not in columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE instances ADD COLUMN expires_at DATETIME NULL"
+                    )
+                )
+
+    if "app_settings" not in tables:
+        # ``create_all`` will build it from the model right after, but make the
+        # migration idempotent in case create_all was already run earlier and
+        # only this additive helper runs.
         with engine.begin() as conn:
             conn.execute(
-                text("ALTER TABLE instances ADD COLUMN compose_yaml TEXT DEFAULT ''")
+                text(
+                    "CREATE TABLE IF NOT EXISTS app_settings ("
+                    "  key VARCHAR(64) PRIMARY KEY,"
+                    "  value TEXT NOT NULL DEFAULT '',"
+                    "  updated_at DATETIME NOT NULL"
+                    ")"
+                )
             )
 
 

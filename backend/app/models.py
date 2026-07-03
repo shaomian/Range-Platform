@@ -51,3 +51,18 @@ class Instance(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     stopped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # When the instance should be auto-stopped (UTC). ``None`` disables the
+    # auto-stop countdown for this instance (kept for backwards compat).
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class AppSetting(Base):
+    """Key/value store for admin-tunable runtime settings."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

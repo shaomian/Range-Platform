@@ -1,7 +1,8 @@
 # Vulhub Range Platform
-<img width="2486" height="1190" alt="image" src="https://github.com/user-attachments/assets/61f3e564-be60-436c-946c-c6b77c97433e" />
 
-
+<p align="center">
+  <img src=".github/assets/banner.png" alt="Vulhub Range Platform" height="auto" />
+</p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
@@ -13,7 +14,7 @@ A web-based platform for managing vulnerability ranges — browse, start, stop, 
 
 - **Backend**: FastAPI + SQLAlchemy (SQLite) + JWT auth, driving containers via `docker compose`.
 - **Frontend**: Vue 3 + Vite + Element Plus + Pinia.
-- **Features**: multi-user auth, catalog search (name / CVE / app / tags), README & compose preview, one-click start/stop, live ports & access URLs, container logs, user management, per-user concurrent-instance limits.
+- **Features**: multi-user auth, catalog search (name / CVE / app / tags), README & compose preview, one-click start/stop, live ports & access URLs, container logs, user management, per-user concurrent-instance limits, **instance auto-stop with a live countdown + manual renewal + admin-tunable TTL settings**.
 - **Deployment**: single-container Docker (`docker compose up -d --build`), plus one-click scripts for **Linux / macOS (`deploy.sh`) and Windows (`deploy.ps1`)** — see [Docker deployment (single container)](#docker-deployment-single-container) and [One-click deployment](#one-click-deployment-linux--macos--windows).
 
 ## Quick Start
@@ -120,6 +121,8 @@ docker compose logs -f
 | `MAX_INSTANCES_PER_USER` | Max concurrent instances per normal user | 3        |
 | `PORT_RANGE_START`       | Instance port allocation range (start) | 10000      |
 | `PORT_RANGE_END`         | Instance port allocation range (end)   | 12000      |
+| `INSTANCE_DEFAULT_TTL_MINUTES` | Default instance auto-stop TTL (minutes); admin-tunable at runtime via System Settings | 60  |
+| `INSTANCE_MAX_TTL_MINUTES`     | Max renewal duration (minutes) for non-admin users; admin-tunable at runtime | 1440 |
 | `CORS_ORIGINS`           | Extra allowed CORS origins (not needed for same origin) | empty |
 | `VULHUB_HOST_PATH`       | Host vulhub directory (mount source) | ../vulhub    |
 | `VULHUB_MOUNT`           | vulhub mount path inside the container | /vulhub    |
@@ -295,6 +298,8 @@ The one-click script automates everything below; use these only when the script 
 | `ADMIN_USERNAME`         | Initial admin username                 | admin                     |
 | `ADMIN_PASSWORD`         | Initial admin password                 | admin123                  |
 | `MAX_INSTANCES_PER_USER` | Max concurrent running instances per normal user | 3               |
+| `INSTANCE_DEFAULT_TTL_MINUTES` | Default instance auto-stop TTL (minutes). Seeded into the DB on first start; afterwards admin-tunable from the UI (System Settings) without a restart | 60  |
+| `INSTANCE_MAX_TTL_MINUTES`     | Max renewal duration (minutes) for non-admin users. Seeded into the DB; admin-tunable from the UI | 1440 |
 | `CORS_ORIGINS`           | Allowed frontend origins (comma-separated) | http://localhost:5173,... |
 
 ## Usage flow
@@ -302,8 +307,18 @@ The one-click script automates everything below; use these only when the script 
 1. After logging in, go to the **range list** and filter by name / CVE / app / tags.
 2. Click **Details** to view the README and `docker-compose.yml`.
 3. Click **Start**; the platform runs `docker compose up -d` and returns the access URL (host port).
-4. In **My Instances**, view status, access URL, and logs, or stop / delete instances.
-5. Admins can create / edit / disable users under **User Management** and view all users' instances.
+4. In **My Instances**, view status, access URL, and logs, or stop / delete instances. Each running instance shows a **live countdown** to its auto-stop time; click **Renew** to push the deadline back (non-admins are capped by the configured max TTL).
+5. Admins can create / edit / disable users under **User Management**, view all users' instances, and tune the default / max TTL under **System Settings**.
+
+## Instance auto-stop & renewal
+
+To prevent forgotten test environments from running indefinitely, every started instance is assigned an auto-stop deadline (`expires_at` = start time + the default TTL):
+
+- A background reaper checks every 15s; any running instance past its deadline is stopped with `docker compose down -v` (same as a manual stop) and marked stopped.
+- The **My Instances** page shows a per-second **countdown** (turns orange under 5 minutes, red under 1 minute) and auto-refreshes every 30s so auto-stops are reflected without a manual reload.
+- **Renew**: click **Renew** on a running instance and choose a duration in minutes — the deadline is reset to `now + N minutes`. Non-admin users are limited to the configured max TTL; admins can pick any positive duration.
+- **Admin configuration**: under **System Settings** an admin can change the **default TTL** (applied to newly started instances) and the **max renewal TTL** (the cap for non-admin renewals). These are stored in the database and take effect immediately — no restart needed. The `INSTANCE_DEFAULT_TTL_MINUTES` / `INSTANCE_MAX_TTL_MINUTES` env vars only seed the initial values on first startup.
+- Existing running instances keep their already-assigned `expires_at` after a settings change; users extend them on demand via **Renew**.
 
 ## Adding and maintaining ranges
 

@@ -25,11 +25,19 @@
           <span v-if="!row.ports.length">-</span>
         </template>
       </el-table-column>
+      <el-table-column label="剩余时长" width="140">
+        <template #default="{ row }">
+          <span v-if="row.status === 'running' && row.expires_at" :style="{ color: countdownColor(row) }">
+            {{ countdown(row) }}
+          </span>
+          <span v-else style="color: #909399">-</span>
+        </template>
+      </el-table-column>
       <el-table-column v-if="auth.isAdmin && showAll" prop="owner_username" label="所属用户" width="120" />
       <el-table-column label="创建时间" width="180">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="360" fixed="right">
+      <el-table-column label="操作" width="430" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="refreshStatus(row)">状态</el-button>
           <el-button size="small" @click="viewLogs(row)">日志</el-button>
@@ -43,6 +51,14 @@
           </el-button>
           <el-button
             size="small"
+            type="primary"
+            :disabled="row.status !== 'running'"
+            @click="renew(row)"
+          >
+            续期
+          </el-button>
+          <el-button
+            size="small"
             type="warning"
             :disabled="row.status !== 'running'"
             @click="stop(row)"
@@ -53,6 +69,23 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-dialog v-model="renewVisible" title="续期实例" width="380px">
+      <el-form :model="renewForm" label-width="100px">
+        <el-form-item label="续期时长">
+          <el-input-number v-model="renewForm.minutes" :min="1" :max="renewMax" :step="15" />
+          <span style="margin-left: 8px; color: #909399">分钟</span>
+        </el-form-item>
+        <div style="color: #909399; font-size: 12px">
+          续期后将自当前时刻起 {{ renewForm.minutes }} 分钟后自动停止。
+          <span v-if="renewForm.maxHint">{{ renewForm.maxHint }}</span>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="renewVisible = false">取消</el-button>
+        <el-button type="primary" :loading="renewing" @click="doRenew">确认续期</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="logsVisible" title="容器日志" width="70%">
       <pre class="logs">{{ logs }}</pre>
@@ -72,13 +105,13 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { instanceApi } from '../api'
+import { instanceApi, settingsApi } from '../api'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -95,8 +128,63 @@ let term = null
 let fitAddon = null
 let ws = null
 
+// Live countdown needs a per-second re-render. We don't poll the server every
+// second; we just bump a reactive "now" tick so the computed countdown reads
+// fresh values. A slower 30s server refresh catches auto-stops and removals.
+const nowTick = ref(Date.now())
+let countdownTimer = null
+let pollTimer = null
+
+// TTL configuration loaded from the admin settings endpoint.
+const ttlConfig = reactive({
+  defaultMinutes: 60,
+  maxMinutes: 1440,
+})
+
+// Renew dialog state.
+const renewVisible = ref(false)
+const renewing = ref(false)
+const renewForm = reactive({ minutes: 60, maxHint: '', targetId: null })
+const renewMax = ref(1440)
+
 function formatTime(t) {
   return t ? new Date(t).toLocaleString() : '-'
+}
+
+function _remainingMs(row) {
+  if (!row.expires_at) return null
+  const end = new Date(row.expires_at).getTime()
+  return end - nowTick.value
+}
+
+function countdown(row) {
+  const ms = _remainingMs(row)
+  if (ms === null) return '-'
+  if (ms <= 0) return '即将停止'
+  const totalSec = Math.floor(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  const pad = (n) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
+function countdownColor(row) {
+  const ms = _remainingMs(row)
+  if (ms === null) return '#909399'
+  if (ms <= 60 * 1000) return '#f56c6c' // <1m -> red
+  if (ms <= 5 * 60 * 1000) return '#e6a23c' // <5m -> orange
+  return '#67c23a'
+}
+
+async function loadSettings() {
+  try {
+    const { data } = await settingsApi.get()
+    ttlConfig.defaultMinutes = data.instance_default_ttl_minutes
+    ttlConfig.maxMinutes = data.instance_max_ttl_minutes
+  } catch (e) {
+    /* keep defaults; non-fatal */
+  }
 }
 
 async function load() {
@@ -208,6 +296,37 @@ async function stop(row) {
   load()
 }
 
+function renew(row) {
+  renewForm.targetId = row.id
+  renewForm.minutes = ttlConfig.defaultMinutes
+  const isOwner = auth.user?.id === row.owner_id
+  if (auth.isAdmin) {
+    renewMax.value = 43200 // 30 days upper bound for the picker (admin otherwise unrestricted)
+    renewForm.maxHint = '管理员不受上限约束。'
+  } else {
+    renewMax.value = ttlConfig.maxMinutes
+    renewForm.maxHint = isOwner
+      ? `普通用户单次最长 ${ttlConfig.maxMinutes} 分钟。`
+      : ''
+  }
+  renewVisible.value = true
+}
+
+async function doRenew() {
+  renewing.value = true
+  try {
+    const { data } = await instanceApi.renew(renewForm.targetId, renewForm.minutes)
+    const row = items.value.find((i) => i.id === renewForm.targetId)
+    if (row) Object.assign(row, data)
+    ElMessage.success(`已续期至 ${renewForm.minutes} 分钟后自动停止`)
+    renewVisible.value = false
+  } catch (e) {
+    /* handled by interceptor */
+  } finally {
+    renewing.value = false
+  }
+}
+
 async function remove(row) {
   await ElMessageBox.confirm(`确认删除「${row.env_name}」的实例记录? 若在运行将先停止。`, '提示', {
     type: 'warning',
@@ -217,7 +336,19 @@ async function remove(row) {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  await loadSettings()
+  await load()
+  countdownTimer = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+  pollTimer = setInterval(load, 30000)
+})
+
+onBeforeUnmount(() => {
+  if (countdownTimer) clearInterval(countdownTimer)
+  if (pollTimer) clearInterval(pollTimer)
+})
 </script>
 
 <style scoped>

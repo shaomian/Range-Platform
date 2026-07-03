@@ -1,6 +1,7 @@
 """FastAPI application entrypoint for the vulhub range platform."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -12,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .database import SessionLocal, init_db
 from .models import User
-from .routers import auth, environments, instances, terminal, users
+from .routers import auth, environments, instances, settings as settings_router, terminal, users
 from .security import hash_password
 from .services.catalog import catalog
 
@@ -41,6 +42,7 @@ def _ensure_admin() -> None:
 async def lifespan(app: FastAPI):
     init_db()
     _ensure_admin()
+    settings_router.seed_settings()
     catalog.load()
     logger.info(
         "Loaded %d vulhub environments from %s",
@@ -48,7 +50,13 @@ async def lifespan(app: FastAPI):
         settings.vulhub_path,
     )
     instances.reconcile_on_startup()
+    reaper_task = asyncio.create_task(instances.auto_stop_loop())
     yield
+    reaper_task.cancel()
+    try:
+        await reaper_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="Vulhub Range Platform", version="1.0.0", lifespan=lifespan)
@@ -65,6 +73,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(environments.router)
 app.include_router(instances.router)
+app.include_router(settings_router.router)
 app.include_router(terminal.router)
 
 

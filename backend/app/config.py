@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Resource limits
     max_instances_per_user: int = 3
 
+    # Default instance TTL (auto-stop timeout) in minutes, applied when a new
+    # instance is started. Admin-tunable via the /api/settings endpoint.
+    instance_default_ttl_minutes: int = 60
+    # Maximum TTL (minutes) a regular user may request when renewing an
+    # instance. Admin-tunable; admins bypass the cap.
+    instance_max_ttl_minutes: int = 1440
+
     # Per-instance host port allocation range (inclusive). Each started
     # environment gets its declared host ports remapped to random free ports
     # within this range so multiple instances never collide.

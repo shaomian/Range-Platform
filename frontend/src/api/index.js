@@ -49,9 +49,15 @@ export const instanceApi = {
   list: (all = false) => api.get('/instances', { params: { all } }),
   start: (envPath) => api.post('/instances', { env_path: envPath }),
   stop: (id) => api.post(`/instances/${id}/stop`),
+  renew: (id, minutes) => api.post(`/instances/${id}/renew`, { minutes }),
   remove: (id) => api.delete(`/instances/${id}`),
   logs: (id, tail = 500) => api.get(`/instances/${id}/logs`, { params: { tail } }),
   status: (id) => api.get(`/instances/${id}/status`),
+}
+
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  update: (data) => api.put('/settings', data),
 }
 
 export const userApi = {

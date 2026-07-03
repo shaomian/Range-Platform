@@ -78,7 +78,25 @@ class InstanceOut(BaseModel):
     owner_username: str | None = None
     created_at: datetime
     stopped_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class InstanceCreate(BaseModel):
     env_path: str
+
+
+class InstanceRenew(BaseModel):
+    # Minutes to (re)set the instance's auto-stop expiry to, counting from now.
+    # ``0`` / omitted means "extend by the system default TTL".
+    minutes: int = Field(default=0, ge=0)
+
+
+# ---- Admin settings ----
+class SettingsOut(BaseModel):
+    instance_default_ttl_minutes: int
+    instance_max_ttl_minutes: int
+
+
+class SettingsUpdate(BaseModel):
+    instance_default_ttl_minutes: int | None = Field(default=None, ge=1)
+    instance_max_ttl_minutes: int | None = Field(default=None, ge=1)

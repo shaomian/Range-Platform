@@ -64,6 +64,17 @@
 - [x] 首次启动、数据库为空时按 `.env` 的 `ADMIN_PASSWORD` 创建管理员
 - [x] Windows 下 `docker` 子进程输出统一 UTF-8 解码，避免 GBK 报错
 
+## 四之二、实例超时自动停止与续期（本次新增）
+
+- [x] **数据模型**：`Instance` 新增 `expires_at`（自动停止时刻，UTC）；新增 `AppSetting` 键值表存管理员可调配置；`database.py` 迁移为已有库追加列与表
+- [x] **启动即赋过期时间**：启动实例时 `expires_at = now + 默认 TTL`
+- [x] **后台清理任务（reaper）**：`auto_stop_loop()` 每 15s 扫描 `expires_at<=now` 的运行中实例，`compose down -v` 后标记已停止；阻塞子进程经 `asyncio.to_thread` 不阻塞事件循环；失败留待下轮重试；在 `lifespan` 中启动、关闭时取消
+- [x] **续期接口** `POST /api/instances/{id}/renew`（body `{"minutes":N}`，0/缺省=默认 TTL）：重置 `expires_at = now + N`；普通用户受最大续期时长约束、管理员不限；已停止实例返回 400
+- [x] **管理员可配置** `GET/PUT /api/settings`（GET 任意登录用户可读、PUT 仅管理员）：默认超时时间、最大续期时长，存数据库即时生效；启动时 seed 默认值；`INSTANCE_DEFAULT_TTL_MINUTES` / `INSTANCE_MAX_TTL_MINUTES` 仅作初始 seed
+- [x] **前端倒计时**：「我的实例」新增「剩余时长」列，按秒刷新（<5m 橙、<1m 红），每 30s 自动刷新列表反映自动停止
+- [x] **前端续期**：运行中实例「续期」按钮弹窗选分钟数，普通用户上限取自配置、管理员不限
+- [x] **系统设置页**（`SettingsView.vue`，仅管理员）：调整默认超时 / 最大续期；侧边栏新增「系统设置」菜单与路由
+
 ## 五、跨平台注意事项（维护要点）
 
 - [ ] **bind mount 路径一致性**：使用相对 bind mount 的靶场需容器内路径 == 宿主机绝对路径
