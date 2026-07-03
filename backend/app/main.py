@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .database import SessionLocal, init_db
 from .models import User
-from .routers import auth, environments, instances, users
+from .routers import auth, environments, instances, terminal, users
 from .security import hash_password
 from .services.catalog import catalog
 
@@ -65,6 +65,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(environments.router)
 app.include_router(instances.router)
+app.include_router(terminal.router)
 
 
 @app.get("/api/health")

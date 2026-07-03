@@ -314,3 +314,11 @@ def docker_available() -> bool:
     except DockerError:
         return False
     return res.ok
+
+
+def first_running_container(env_path: str, project: str, compose_yaml: str) -> str | None:
+    """Return the name of the first running container for an instance."""
+    for c in compose_ps(env_path, project, compose_yaml):
+        if (c.get("State") or "").lower() == "running":
+            return c.get("Name") or c.get("Id")
+    return None
