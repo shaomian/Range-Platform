@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Management helper for the Vulhub Range Platform (Linux / macOS).
+# Management helper for the Vulhub Hub (Linux / macOS).
 # Wraps `docker compose` for the platform container defined in docker-compose.yml.
 # Windows users: use manage.ps1 (PowerShell) instead.
 #
-# Usage (from the range-platform directory):
+# Usage (from the vulhub-hub directory):
 #   ./manage.sh <command>
 #
 # Commands:
@@ -15,7 +15,7 @@
 #   logs      Follow the platform logs (Ctrl-C to exit).
 #   rebuild   Rebuild the image and restart (after backend/frontend changes).
 #   down      Remove the platform container (data volume preserved).
-#   destroy   Remove the container AND the range-data volume (DELETES the database!).
+#   destroy   Remove the container AND the vulhub-hub-data volume (DELETES the database!).
 #
 # NOTE: These commands only affect the *platform* container. Running vulhub
 # targets are separate compose projects and are unaffected by stop/restart.
@@ -99,12 +99,12 @@ case "$cmd" in
     dc down
     ;;
   destroy)
-    warn "This removes the container AND the range-data volume (SQLite database,"
+    warn "This removes the container AND the vulhub-hub-data volume (SQLite database,"
     warn "user accounts and instance records will be permanently deleted)."
     printf 'Type EXACTLY "yes" to continue: '
     read -r reply
     [ "$reply" = "yes" ] || die "Aborted."
-    log "Removing container and range-data volume (docker compose down -v)"
+    log "Removing container and vulhub-hub-data volume (docker compose down -v)"
     dc down -v
     ;;
   ""|-h|--help|help)

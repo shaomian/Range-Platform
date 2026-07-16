@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 720
 
     # Database
-    database_url: str = "sqlite:///./range_platform.db"
+    database_url: str = "sqlite:///./vulhub_hub.db"
 
     # Vulhub catalog
     vulhub_root: str = "../../vulhub"

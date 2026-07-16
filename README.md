@@ -1,11 +1,11 @@
-# Vulhub Range Platform
+# Vulhub Hub
 
 <p align="center">
-  <img src=".github/assets/banner.png" alt="Vulhub Range Platform" height="auto" />
+  <img src=".github/assets/banner.png" alt="Vulhub Hub" height="auto" />
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/shaomian/vulhub-hub?style=social)](https://github.com/shaomian/vulhub-hub/stargazers)
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 **语言 / Language**: **English** | [中文](README.zh-cn.md)
@@ -23,8 +23,8 @@ Prerequisites: **Docker** and **docker compose** installed on the target host (i
 
 ```bash
 # 1. Clone this repository
-git clone https://github.com/shaomian/Range-Platform.git
-cd Range-Platform
+git clone https://github.com/shaomian/vulhub-hub.git
+cd vulhub-hub
 
 # 2. One-click deploy (auto: install Docker if missing, clone vulhub,
 #    generate random secret & admin password, build and start)
@@ -50,7 +50,7 @@ Day-to-day operations (affect the platform container only):
 ## Project structure
 
 ```
-range-platform/
+vulhub-hub/
 ├── backend/            # FastAPI backend
 │   ├── app/            # application code (routers/services/models...)
 │   ├── requirements.txt
@@ -71,7 +71,7 @@ For development without Docker, run the backend and frontend separately:
 
 ```powershell
 # Backend -> http://127.0.0.1:8000 (API docs at /docs)
-cd range-platform/backend
+cd vulhub-hub/backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
@@ -92,7 +92,7 @@ In single-container mode the backend serves both the API and the frontend static
 Prerequisites: Docker and `docker compose` installed on the host; a sibling `vulhub/` directory (compose uses `../vulhub` as the mount source by default; the `deploy` scripts `git clone` it when missing).
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 docker compose up -d --build
 ```
 
@@ -109,7 +109,7 @@ docker compose ps
 docker compose logs -f
 ```
 
-**Configurable options** (optional, create `.env` under `range-platform/` to override):
+**Configurable options** (optional, create `.env` under `vulhub-hub/` to override):
 
 | Variable | Description | Default |
 | ------------------------ | -------------------------------- | ----------------- |
@@ -151,7 +151,7 @@ After deployment, use the management scripts to wrap `docker compose` for conven
 **Linux / macOS (`manage.sh`)**:
 
 ```bash
-cd range-platform
+cd vulhub-hub
 chmod +x manage.sh
 ./manage.sh restart      # restart the platform (Linux adds sudo automatically)
 ```
@@ -159,7 +159,7 @@ chmod +x manage.sh
 **Windows (`manage.ps1`)**:
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 powershell -ExecutionPolicy Bypass -File .\manage.ps1 restart
 ```
 
@@ -194,7 +194,7 @@ The image is **built locally on each host**, so nothing needs to be migrated acr
 **Linux / macOS** — sync this repository to the host and run (the script uses `uname` to detect the OS; on Linux it auto-detects the distro to choose the install method):
 
 ```bash
-cd range-platform
+cd vulhub-hub
 chmod +x deploy.sh
 sudo ./deploy.sh      # macOS: no sudo needed: ./deploy.sh
 ```
@@ -204,7 +204,7 @@ sudo ./deploy.sh      # macOS: no sudo needed: ./deploy.sh
 **Windows** — run in PowerShell (requires Docker Desktop with the WSL2 or Hyper-V backend):
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
@@ -223,7 +223,7 @@ Because the backend only creates the admin from `.env`'s `ADMIN_PASSWORD` when *
 Linux / macOS:
 
 ```bash
-cd range-platform
+cd vulhub-hub
 sudo docker compose down -v   # macOS: drop sudo; -v deletes the range-data volume (SQLite DB), clearing accounts/instances
 rm -f .env                    # remove the old .env so the script regenerates a random SECRET_KEY and admin password
 sudo ./deploy.sh              # redeploy; the new admin credentials are printed once at the end
@@ -232,7 +232,7 @@ sudo ./deploy.sh              # redeploy; the new admin credentials are printed 
 Windows (PowerShell):
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 docker compose down -v        # delete the range-data volume (with the DB)
 Remove-Item .env -ErrorAction SilentlyContinue
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
@@ -248,7 +248,7 @@ The one-click script automates everything below; use these only when the script 
 2. **Create `.env`** (key: keep vulhub paths identical inside and outside the container):
 
    ```bash
-   cd range-platform
+   cd vulhub-hub
    VULHUB=$(cd ../vulhub && pwd)
    cat > .env <<EOF
    SECRET_KEY=$(openssl rand -hex 32)

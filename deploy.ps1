@@ -1,5 +1,5 @@
 <#
-  One-click deployment for the Vulhub Range Platform on Windows (PowerShell).
+  One-click deployment for the Vulhub Hub on Windows (PowerShell).
 
   Requires Docker Desktop (with WSL2 or Hyper-V backend). If Docker is missing the
   script tries to install it via winget, then asks you to start Docker Desktop.
@@ -7,7 +7,7 @@
   writes .env (random SECRET_KEY + random admin password, host IP as
   SERVER_HOST, vulhub mount) and runs: docker compose up -d --build.
 
-  Usage (from the range-platform directory):
+  Usage (from the vulhub-hub directory):
     powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
   Linux / macOS users: run ./deploy.sh instead.
@@ -56,7 +56,7 @@ function Ensure-Docker {
 
 function Ensure-Vulhub {
   # The platform reads its catalog from a sibling ../vulhub directory. On a fresh
-  # deployment only range-platform/ is present, so clone the upstream catalog.
+  # deployment only vulhub-hub/ is present, so clone the upstream catalog.
   $vulhubDir = Join-Path $PSScriptRoot '..\vulhub'
   if (Test-Path (Join-Path $vulhubDir '.git')) {
     Log "vulhub catalog already present ($vulhubDir)"
@@ -108,7 +108,7 @@ function Write-EnvFile {
   $script:NewAdminPw = $adminPw
   $ip = Get-HostIPv4
   $vulhub = Resolve-Path (Join-Path $PSScriptRoot '..\vulhub') -ErrorAction SilentlyContinue
-  if (-not $vulhub) { Warn "vulhub not found beside range-platform/; edit .env afterwards" }
+  if (-not $vulhub) { Warn "vulhub not found beside vulhub-hub/; edit .env afterwards" }
   # Docker Desktop accepts forward-slashed Windows paths in compose bind mounts.
   $vulhubPath = if ($vulhub) { $vulhub.Path -replace '\\', '/' } else { '../vulhub' }
   Log "Writing .env (SERVER_HOST=$ip, vulhub=$vulhubPath)"
@@ -152,7 +152,7 @@ function Main {
     Log "Existing .env kept; admin password unchanged (see ADMIN_PASSWORD in .env)."
   }
   Warn "If the platform port is blocked, allow it in Windows Firewall (elevated):"
-  Warn "  New-NetFirewallRule -DisplayName 'range-platform 8000' -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow"
+  Warn "  New-NetFirewallRule -DisplayName 'vulhub-hub 8000' -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow"
 }
 
 Main

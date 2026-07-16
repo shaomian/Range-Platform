@@ -20,7 +20,7 @@ from ..services import settings_store as store
 
 router = APIRouter(prefix="/api/instances", tags=["instances"])
 
-logger = logging.getLogger("range_platform")
+logger = logging.getLogger("vulhub_hub")
 
 # How often (seconds) the background reaper sweeps for expired instances.
 _REAPER_INTERVAL = 15

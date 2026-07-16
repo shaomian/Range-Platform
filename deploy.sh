@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click deployment for the Vulhub Range Platform on Linux and macOS.
+# One-click deployment for the Vulhub Hub on Linux and macOS.
 # Linux: installs Docker + the compose v2 plugin if missing across all mainstream
 #   distros: Debian/Ubuntu/Kali/Mint (apt), Fedora/CentOS/RHEL/Rocky/Alma/Oracle
 #   (dnf|yum), Amazon Linux, openSUSE/SLES (zypper), Arch/Manjaro (pacman),
@@ -232,7 +232,7 @@ ensure_git() {
 }
 
 # The platform reads its catalog from a sibling ../vulhub directory. On a fresh
-# deployment only range-platform/ is present, so clone the upstream catalog.
+# deployment only vulhub-hub/ is present, so clone the upstream catalog.
 ensure_vulhub() {
   local vulhub_dir="$SCRIPT_DIR/../vulhub"
   if [ -d "$vulhub_dir/.git" ]; then
@@ -256,7 +256,7 @@ write_env() {
   fi
   local vulhub ip secret admin_pw
   vulhub="$(cd "$SCRIPT_DIR/../vulhub" 2>/dev/null && pwd || true)"
-  [ -n "$vulhub" ] || warn "vulhub not found beside range-platform/; edit .env afterwards"
+  [ -n "$vulhub" ] || warn "vulhub not found beside vulhub-hub/; edit .env afterwards"
   ip="$(detect_ip)"
   secret="$(openssl rand -hex 32 2>/dev/null || echo "change-me-$(date +%s)")"
   # Random admin password for this first-time deployment (16 alphanumerics).

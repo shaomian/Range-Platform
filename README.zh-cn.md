@@ -1,11 +1,11 @@
-# Vulhub 靶场管理平台
+# Vulhub Hub
 
 <p align="center">
-  <img src=".github/assets/banner.png" alt="Vulhub 靶场管理平台" height="auto" />
+  <img src=".github/assets/banner.png" alt="Vulhub Hub" height="auto" />
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/shaomian/Range-Platform?style=social)](https://github.com/shaomian/Range-Platform/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/shaomian/vulhub-hub?style=social)](https://github.com/shaomian/vulhub-hub/stargazers)
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 **语言 / Language**: [English](README.md) | **中文**
@@ -23,8 +23,8 @@
 
 ```bash
 # 1. 克隆本仓库
-git clone https://github.com/shaomian/Range-Platform.git
-cd Range-Platform
+git clone https://github.com/shaomian/vulhub-hub.git
+cd vulhub-hub
 
 # 2. 一键部署（自动：缺失时安装 Docker、克隆 vulhub、生成随机密钥与随机管理员密码、构建并启动）
 #    Linux:   sudo ./deploy.sh
@@ -48,7 +48,7 @@ cd Range-Platform
 ## 目录结构
 
 ```
-range-platform/
+vulhub-hub/
 ├── backend/            # FastAPI 后端
 │   ├── app/            # 应用代码 (routers/services/models...)
 │   ├── requirements.txt
@@ -69,7 +69,7 @@ range-platform/
 
 ```powershell
 # 后端 -> http://127.0.0.1:8000（API 文档在 /docs）
-cd range-platform/backend
+cd vulhub-hub/backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item .env.example .env
@@ -90,7 +90,7 @@ npm run dev        # 生产构建：npm run build -> frontend/dist
 前置条件：宿主机已安装 Docker 与 `docker compose`；同级目录存在 `vulhub/`（compose 默认以 `../vulhub` 作为挂载源，缺失时 `deploy` 脚本会自动 `git clone` 拉取）。
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 docker compose up -d --build
 ```
 
@@ -107,7 +107,7 @@ docker compose ps
 docker compose logs -f
 ```
 
-**可配置项**（可选，在 `range-platform/` 下创建 `.env` 覆盖）：
+**可配置项**（可选，在 `vulhub-hub/` 下创建 `.env` 覆盖）：
 
 | 变量                     | 说明                             | 默认值            |
 | ------------------------ | -------------------------------- | ----------------- |
@@ -149,7 +149,7 @@ docker compose up -d --build
 **Linux / macOS（`manage.sh`）**：
 
 ```bash
-cd range-platform
+cd vulhub-hub
 chmod +x manage.sh
 ./manage.sh restart      # 重启平台（Linux 会自动加 sudo）
 ```
@@ -157,7 +157,7 @@ chmod +x manage.sh
 **Windows（`manage.ps1`）**：
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 powershell -ExecutionPolicy Bypass -File .\manage.ps1 restart
 ```
 
@@ -191,7 +191,7 @@ powershell -ExecutionPolicy Bypass -File .\manage.ps1 restart
 **Linux / macOS** —— 将本仓库同步到主机后执行（脚本用 `uname` 识别系统；Linux 自动识别发行版选择安装方式）：
 
 ```bash
-cd range-platform
+cd vulhub-hub
 chmod +x deploy.sh
 sudo ./deploy.sh      # macOS 无需 sudo：./deploy.sh
 ```
@@ -201,7 +201,7 @@ sudo ./deploy.sh      # macOS 无需 sudo：./deploy.sh
 **Windows** —— 在 PowerShell 中执行（需 Docker Desktop，WSL2 或 Hyper-V 后端）：
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
@@ -220,7 +220,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 Linux / macOS：
 
 ```bash
-cd range-platform
+cd vulhub-hub
 sudo docker compose down -v   # macOS 去掉 sudo；-v 会删除 range-data 卷（含 SQLite 数据库），账户/实例记录一并清除
 rm -f .env                    # 删除旧 .env，让脚本重新生成随机 SECRET_KEY 与随机管理员密码
 sudo ./deploy.sh              # 重新部署，结束时会再次一次性打印新的管理员账号密码
@@ -229,7 +229,7 @@ sudo ./deploy.sh              # 重新部署，结束时会再次一次性打印
 Windows（PowerShell）：
 
 ```powershell
-cd range-platform
+cd vulhub-hub
 docker compose down -v        # 删除 range-data 卷（含数据库）
 Remove-Item .env -ErrorAction SilentlyContinue
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
@@ -245,7 +245,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 2. **配置 `.env`**（关键：让 vulhub 在容器内外路径一致）：
 
    ```bash
-   cd range-platform
+   cd vulhub-hub
    VULHUB=$(cd ../vulhub && pwd)
    cat > .env <<EOF
    SECRET_KEY=$(openssl rand -hex 32)

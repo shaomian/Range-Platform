@@ -34,7 +34,7 @@ COPY --from=frontend /build/dist ./static
 RUN mkdir -p /data
 
 ENV STATIC_DIR=/app/static \
-    DATABASE_URL=sqlite:////data/range_platform.db \
+    DATABASE_URL=sqlite:////data/vulhub_hub.db \
     PYTHONUNBUFFERED=1
 
 EXPOSE 8000

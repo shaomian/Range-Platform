@@ -32,8 +32,8 @@
   - [x] `status` / `ps`：查看容器状态
   - [x] `logs`：跟随平台日志（`--tail=200`）
   - [x] `rebuild` / `update`：重建镜像并重启（代码变更后使用）
-  - [x] `down`：移除平台容器（保留 `range-data` 数据卷）
-  - [x] `destroy`：移除容器并删除 `range-data` 卷（**会清空数据库，需输入 yes 二次确认**）
+  - [x] `down`：移除平台容器（保留 `vulhub-hub-data` 数据卷）
+  - [x] `destroy`：移除容器并删除 `vulhub-hub-data` 卷（**会清空数据库，需输入 yes 二次确认**）
   - [x] Linux 自动加 `sudo`，macOS/Windows 不加；无 docker/compose 时报错退出
   - [x] 说明：以上命令仅作用于**平台容器**；运行中的 vulhub 靶场为独立 compose 项目，不受影响
 
@@ -47,7 +47,7 @@
 - [x] **`docker-compose.yml`** 单容器编排：
   - [x] `restart: unless-stopped`、端口 `${PLATFORM_PORT:-8000}:8000`
   - [x] 环境变量全部支持 `.env` 覆盖（SECRET_KEY / SERVER_HOST / ADMIN_* / 端口范围等）
-  - [x] 挂载 `/var/run/docker.sock`（DooD）、vulhub 目录、`range-data` 卷持久化 SQLite
+  - [x] 挂载 `/var/run/docker.sock`（DooD）、vulhub 目录、`vulhub-hub-data` 卷持久化 SQLite
 
 ## 四、平台核心功能（后端 / 前端）
 

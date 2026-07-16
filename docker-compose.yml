@@ -1,22 +1,22 @@
-# Single-container deployment for the Vulhub Range Platform.
+# Single-container deployment for the Vulhub Hub.
 #
 # The backend serves both the API and the compiled frontend (same origin, so no
 # CORS is required) and drives the *host* Docker daemon via the mounted socket
 # (Docker-out-of-Docker) to start/stop vulhub targets.
 #
-# Quick start (from the range-platform/ directory):
+# Quick start (from the vulhub-hub/ directory):
 #   docker compose up -d --build
 #
 # Override any of the ${VAR:-default} values via a .env file placed next to this
 # compose file, or via shell environment variables. See README.md for details.
 
 services:
-  range-platform:
+  vulhub-hub:
     build:
       context: .
       dockerfile: Dockerfile
-    image: range-platform:latest
-    container_name: range-platform
+    image: vulhub-hub:latest
+    container_name: vulhub-hub
     restart: unless-stopped
     ports:
       - "${PLATFORM_PORT:-8000}:8000"
@@ -51,7 +51,7 @@ services:
       # VULHUB_MOUNT to the same absolute path (see README.md).
       - "${VULHUB_HOST_PATH:-../vulhub}:${VULHUB_MOUNT:-/vulhub}"
       # Persist the SQLite database across container restarts.
-      - range-data:/data
+      - vulhub-hub-data:/data
 
 volumes:
-  range-data:
+  vulhub-hub-data:

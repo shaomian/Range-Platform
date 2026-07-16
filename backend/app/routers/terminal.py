@@ -24,7 +24,7 @@ from ..models import Instance, User
 from ..security import decode_access_token
 from ..services import docker_service as ds
 
-logger = logging.getLogger("range_platform")
+logger = logging.getLogger("vulhub_hub")
 router = APIRouter(prefix="/api/instances", tags=["instances"])
 
 

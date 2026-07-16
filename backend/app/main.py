@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint for the vulhub range platform."""
+"""FastAPI application entrypoint for the vulhub hub."""
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +17,7 @@ from .routers import auth, environments, instances, settings as settings_router,
 from .security import hash_password
 from .services.catalog import catalog
 
-logger = logging.getLogger("range_platform")
+logger = logging.getLogger("vulhub_hub")
 
 
 def _ensure_admin() -> None:
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Vulhub Range Platform", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Vulhub Hub", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
