@@ -55,8 +55,8 @@ def _to_out(inst: Instance) -> InstanceOut:
         ports=ports,
         owner_id=inst.owner_id,
         owner_username=inst.owner.username if inst.owner else None,
-        created_at=inst.created_at,
-        stopped_at=inst.stopped_at,
+        created_at=_ensure_utc(inst.created_at),
+        stopped_at=_ensure_utc(inst.stopped_at),
         expires_at=_ensure_utc(inst.expires_at),
     )
 

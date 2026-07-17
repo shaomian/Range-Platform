@@ -1,9 +1,28 @@
 """Pydantic schemas for request/response bodies."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize a datetime to timezone-aware UTC for API serialization.
+
+    Timestamps are generated with ``datetime.now(timezone.utc)`` but SQLite's
+    SQLAlchemy dialect strips the tzinfo for ``DateTime`` columns that aren't
+    declared ``DateTime(timezone=True)`` (e.g. ``created_at``/``stopped_at``).
+    Returning naive datetimes would serialize to offset-less ISO strings, which
+    browsers (mis)interpret as local wall-clock time -- shifting the displayed
+    instant by the user's UTC offset. Normalizing here guarantees every API
+    response carries a ``+00:00`` suffix so the frontend ``new Date(...).toLoc-
+    aleString()`` correctly converts UTC to the browser's local timezone.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 # ---- Auth ----
@@ -39,6 +58,10 @@ class UserOut(UserBase):
     id: int
     is_active: bool
     created_at: datetime
+
+    @field_serializer("created_at")
+    def _serialize_created_at(self, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
 
 
 # ---- Environments (catalog) ----
@@ -79,6 +102,10 @@ class InstanceOut(BaseModel):
     created_at: datetime
     stopped_at: datetime | None = None
     expires_at: datetime | None = None
+
+    @field_serializer("created_at", "stopped_at", "expires_at")
+    def _serialize_timestamps(self, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
 
 
 class InstanceCreate(BaseModel):
